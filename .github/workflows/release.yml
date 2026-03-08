@@ -13,6 +13,14 @@ on:
 jobs:
   build:
     runs-on: macos-14
+    strategy:
+      matrix:
+        arch: [arm64, x86_64]
+        include:
+          - arch: arm64
+            label: Apple-Silicon
+          - arch: x86_64
+            label: Intel
     steps:
       - uses: actions/checkout@v4
 
@@ -24,10 +32,10 @@ jobs:
             echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           fi
 
-      - name: Build
+      - name: Build (${{ matrix.label }})
         run: |
           cd swift
-          swift build -c release
+          swift build -c release --arch ${{ matrix.arch }}
 
       - name: Package app
         run: |
@@ -35,48 +43,67 @@ jobs:
           mkdir -p "$APP_DIR"
           cp swift/.build/release/HealthTick "$APP_DIR/"
           cp swift/Sources/Info.plist "HealthTick.app/Contents/"
-
           RES_DIR="HealthTick.app/Contents/Resources"
           mkdir -p "$RES_DIR"
           if [ -d "swift/Sources/Resources" ]; then
             cp -R swift/Sources/Resources/* "$RES_DIR/"
           fi
 
+      - name: Sign app
+        run: codesign --force --deep --sign - HealthTick.app
+
       - name: Create DMG
         run: |
           mkdir -p dmg_content
           cp -R HealthTick.app dmg_content/
           ln -s /Applications dmg_content/Applications
-          hdiutil create -volname "HealthTick" -srcfolder dmg_content -ov -format UDZO "HealthTick-${VERSION}.dmg"
+          hdiutil create -volname "HealthTick" -srcfolder dmg_content -ov -format UDZO \
+            "HealthTick-${VERSION}-${{ matrix.label }}.dmg"
 
-      - name: Create ZIP
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HealthTick-${{ matrix.label }}
+          path: "HealthTick-${VERSION}-${{ matrix.label }}.dmg"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set version
         run: |
-          zip -r "HealthTick-${VERSION}.zip" HealthTick.app
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
 
-      - name: Create Release
-        if: github.event_name == 'push'
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: List files
+        run: ls -la *.dmg
+
+      - name: Release to public repo
         uses: softprops/action-gh-release@v2
         with:
+          repository: lifedever/health-tick-release
+          tag_name: ${{ env.VERSION }}
           name: "HealthTick ${{ env.VERSION }}"
           body: |
             ## HealthTick ${{ env.VERSION }}
 
+            ### 下载
+            - **Apple Silicon (M1/M2/M3/M4)**: `HealthTick-${{ env.VERSION }}-Apple-Silicon.dmg`
+            - **Intel**: `HealthTick-${{ env.VERSION }}-Intel.dmg`
+
             ### 安装方式
-            1. 下载 `.dmg` 文件，打开后将 HealthTick 拖入 Applications 文件夹
-            2. 或下载 `.zip` 文件，解压后将 HealthTick.app 移动到应用程序文件夹
+            打开 `.dmg` 文件，将 HealthTick 拖入 Applications 文件夹。
+            首次打开请前往 **系统设置 → 隐私与安全性** 点击"仍要打开"。
 
             ### 更新方式
-            - 应用内会自动检测新版本
-            - 也可在 设置 > 关于 中手动检查更新
-          files: |
-            HealthTick-${{ env.VERSION }}.dmg
-            HealthTick-${{ env.VERSION }}.zip
-
-      - name: Upload artifacts (manual trigger)
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: HealthTick-${{ env.VERSION }}
-          path: |
-            HealthTick-${{ env.VERSION }}.dmg
-            HealthTick-${{ env.VERSION }}.zip
+            应用内自动检测新版本，也可在 设置 → 关于 中手动检查。
+          files: "*.dmg"
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}

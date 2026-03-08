@@ -103,11 +103,14 @@ struct GeneralTab: View {
             .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
 
             Spacer()
-
-            SaveButton()
-                .environmentObject(state)
         }
         .padding(20)
+        .alert("时长已变更", isPresented: $state.showRestartPrompt) {
+            Button("重新计时") { state.restartCurrentPhase() }
+            Button("稍后再说", role: .cancel) {}
+        } message: {
+            Text("工作或休息时长已修改，是否按新设置重新开始计时？")
+        }
     }
 
     private func sliderRow(icon: String, label: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, color: Color) -> some View {
@@ -214,9 +217,6 @@ struct ReminderTab: View {
             .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
 
             Spacer()
-
-            SaveButton()
-                .environmentObject(state)
         }
         .padding(24)
         .animation(.easeInOut(duration: 0.15), value: newReminder)
@@ -230,38 +230,6 @@ struct ReminderTab: View {
     }
 }
 
-// MARK: - 保存按钮
-
-struct SaveButton: View {
-    @EnvironmentObject var state: AppState
-
-    var body: some View {
-        Button {
-            state.saveSettings()
-        } label: {
-            HStack(spacing: 6) {
-                if state.savedFeedback {
-                    Image(systemName: "checkmark")
-                    Text("已保存")
-                } else {
-                    Text("保存设置")
-                }
-            }
-            .frame(width: 100)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(state.savedFeedback ? .green : .accentColor)
-        .controlSize(.large)
-        .animation(.easeInOut(duration: 0.2), value: state.savedFeedback)
-        .alert("时长已变更", isPresented: $state.showRestartPrompt) {
-            Button("重新计时") { state.restartCurrentPhase() }
-            Button("稍后再说", role: .cancel) {}
-        } message: {
-            Text("工作或休息时长已修改，是否按新设置重新开始计时？")
-        }
-    }
-}
-
 // MARK: - 关于
 
 struct AboutTab: View {
@@ -271,58 +239,51 @@ struct AboutTab: View {
     @State private var resetDone = false
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             Spacer()
 
-            ZStack {
-                Circle()
-                    .fill(.green.gradient.opacity(0.15))
-                    .frame(width: 64, height: 64)
-                Image(systemName: "figure.walk")
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundStyle(.green)
-            }
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
 
             Text("HealthTick")
-                .font(.title3.bold())
+                .font(.title2.bold())
 
             Text("健康打卡")
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(.secondary)
 
             Text("v\(appVersion)")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.tertiary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
                 .background(.quaternary, in: Capsule())
 
             Text("久坐提醒 · 强制休息 · 习惯养成")
-                .font(.caption2)
+                .font(.callout)
                 .foregroundStyle(.tertiary)
 
             // Update check
             Button {
                 updater.check(silent: false)
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     if updater.isChecking {
                         ProgressView().controlSize(.small)
                     } else {
                         Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.caption2)
                     }
                     Text(updater.isChecking ? "检查中..." : "检查更新")
-                        .font(.caption)
                 }
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.blue)
+            .controlSize(.regular)
             .disabled(updater.isChecking)
 
             if let err = updater.checkError {
                 Text(err)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.tertiary)
             }
 

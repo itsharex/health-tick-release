@@ -75,14 +75,25 @@ final class AppState: ObservableObject {
     private let db = Database.shared
     var overlayManager = BreakOverlayManager()
 
+    private var configWatcher: AnyCancellable?
+    private var lastSavedConfig: AppConfig?
+
     init() {
         config = db.loadConfig()
+        lastSavedConfig = config
         overlayManager.appState = self
         overlayManager.onForceEnd = { [weak self] in
             self?.forceEndBreak()
         }
         startWork()
         refreshStats()
+
+        // Auto-save when config changes
+        configWatcher = $config
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] newConfig in
+                self?.autoSave(newConfig)
+            }
     }
 
     // MARK: - Timer
@@ -211,22 +222,16 @@ final class AppState: ObservableObject {
         maxStreak = db.maxStreakDays(goal: config.dailyGoal)
     }
 
-    @Published var savedFeedback = false
-
     @Published var showRestartPrompt = false
 
-    func saveSettings() {
-        let oldWork = db.loadConfig().workMinutes
-        let oldBreak = db.loadConfig().breakMinutes
-        db.saveConfig(config)
+    private func autoSave(_ newConfig: AppConfig) {
+        guard let old = lastSavedConfig, newConfig != old else { return }
+        db.saveConfig(newConfig)
         refreshStats()
-        savedFeedback = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            self?.savedFeedback = false
-        }
-        // If work/break duration changed and currently timing, prompt restart
-        if (config.workMinutes != oldWork && (phase == .working || phase == .paused)) ||
-           (config.breakMinutes != oldBreak && phase == .breaking) {
+        lastSavedConfig = newConfig
+
+        if (newConfig.workMinutes != old.workMinutes && (phase == .working || phase == .paused)) ||
+           (newConfig.breakMinutes != old.breakMinutes && phase == .breaking) {
             showRestartPrompt = true
         }
     }

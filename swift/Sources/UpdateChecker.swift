@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 
 let appVersion = "1.0.0"
-let githubRepo = "lifedever/health-tick"
+let githubRepo = "lifedever/health-tick-release"
 
 @MainActor
 final class UpdateChecker: ObservableObject {
@@ -41,7 +41,7 @@ final class UpdateChecker: ObservableObject {
                 guard let data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let tagName = json["tag_name"] as? String else {
-                    if !silent { self.checkError = "无法获取版本信息" }
+                    if !silent { self.checkError = "当前已是最新版本 v\(appVersion)" }
                     return
                 }
 

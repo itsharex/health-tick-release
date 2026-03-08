@@ -7,14 +7,10 @@ struct HelpView: View {
 
                 // Header
                 HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(.green.gradient.opacity(0.15))
-                            .frame(width: 48, height: 48)
-                        Image(systemName: "figure.walk")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(.green)
-                    }
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .frame(width: 48, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("HealthTick 使用指南")
                             .font(.title2.bold())
@@ -122,11 +118,48 @@ struct HelpView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
+                Divider()
+
+                // Sponsor
+                sectionTitle("赞助支持", icon: "heart.fill", color: .red)
+
+                Text("HealthTick 完全免费。如果它对你的健康有帮助，欢迎赞助支持开发者继续维护和改进！")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 24) {
+                    Spacer()
+                    sponsorImage("wechat-pay", label: "微信支付")
+                    sponsorImage("alipay", label: "支付宝")
+                    Spacer()
+                }
+
+                Text("感谢每一位支持者 ❤️")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
                 Spacer(minLength: 20)
             }
             .padding(32)
         }
         .frame(minWidth: 560, minHeight: 500)
+    }
+
+    private func sponsorImage(_ name: String, label: String) -> some View {
+        VStack(spacing: 6) {
+            if let url = Bundle.main.url(forResource: name, withExtension: name == "alipay" ? "png" : "jpg", subdirectory: "Resources"),
+               let img = NSImage(contentsOf: url) {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
     }
 
     private func sectionTitle(_ title: String, icon: String, color: Color) -> some View {
