@@ -60,7 +60,9 @@
 
 ## 📸 截图
 
-*（即将添加）*
+<p align="center">
+  <img src="screenshot.png" width="420" alt="HealthTick 菜单栏">
+</p>
 
 ---
 
