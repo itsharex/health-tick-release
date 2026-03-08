@@ -58,13 +58,13 @@ jobs:
           cp -R HealthTick.app dmg_content/
           ln -s /Applications dmg_content/Applications
           hdiutil create -volname "HealthTick" -srcfolder dmg_content -ov -format UDZO \
-            "HealthTick-${VERSION}-${{ matrix.label }}.dmg"
+            "HealthTick-${{ env.VERSION }}-${{ matrix.label }}.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: HealthTick-${{ matrix.label }}
-          path: "HealthTick-${VERSION}-${{ matrix.label }}.dmg"
+          path: "HealthTick-${{ env.VERSION }}-${{ matrix.label }}.dmg"
 
   release:
     needs: build
@@ -84,7 +84,7 @@ jobs:
           merge-multiple: true
 
       - name: List files
-        run: ls -la *.dmg
+        run: ls -la
 
       - name: Release to public repo
         uses: softprops/action-gh-release@v2
@@ -102,8 +102,5 @@ jobs:
             ### 安装方式
             打开 `.dmg` 文件，将 HealthTick 拖入 Applications 文件夹。
             首次打开请前往 **系统设置 → 隐私与安全性** 点击"仍要打开"。
-
-            ### 更新方式
-            应用内自动检测新版本，也可在 设置 → 关于 中手动检查。
           files: "*.dmg"
           token: ${{ secrets.PUBLIC_REPO_TOKEN }}
