@@ -105,9 +105,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let icon = NSImage(contentsOfFile: iconPath) {
             NSApp.applicationIconImage = icon
         }
-        // Check for updates silently on launch
+        // Check for updates silently on launch, then every 4 hours
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             UpdateChecker.shared.check(silent: true)
+        }
+        Timer.scheduledTimer(withTimeInterval: 4 * 3600, repeats: true) { _ in
+            Task { @MainActor in
+                UpdateChecker.shared.check(silent: true)
+            }
         }
 
         // Monitor window close to hide Dock icon when no windows are open
