@@ -66,18 +66,12 @@ struct StatsWindowView: View {
             }
 
             // Stats grid
-            VStack(spacing: 14) {
-                HStack(spacing: 32) {
-                    heroStat(value: "\(state.currentStreak)", label: "当前连续", icon: "flame.fill", color: .orange)
-                    heroStat(value: "\(state.maxStreak)", label: "最长连续", icon: "crown.fill", color: .yellow)
-                }
-                HStack(spacing: 32) {
-                    heroStat(value: "\(wDone)/\(wTotal)", label: "本周达标", icon: "calendar", color: .purple)
-                    heroStat(value: "\(mDone)/\(mTotal)", label: "本月达标", icon: "calendar.badge.checkmark", color: .pink)
-                }
+            HStack(spacing: 24) {
+                heroStat(value: "\(state.currentStreak)", label: "当前连续", icon: "flame.fill", color: .orange)
+                heroStat(value: "\(state.maxStreak)", label: "最长连续", icon: "crown.fill", color: .yellow)
+                heroStat(value: "\(wDone)/\(wTotal)", label: "本周达标", icon: "calendar", color: .purple)
+                heroStat(value: "\(mDone)/\(mTotal)", label: "本月达标", icon: "calendar.badge.checkmark", color: .pink)
             }
-
-            Spacer()
         }
         .padding(.vertical, 4)
     }
