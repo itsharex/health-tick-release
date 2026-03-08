@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/lifedever/health-tick-release/releases/latest">
-    <img src="https://img.shields.io/github/v/release/lifedever/health-tick-release?style=flat-square&color=34D399&label=最新版本" alt="Latest Release">
+    <img src="https://img.shields.io/github/v/release/lifedever/health-tick-release?style=flat-square&color=34D399&label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC" alt="Latest Release">
   </a>
   <img src="https://img.shields.io/badge/平台-macOS%2014%2B-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/价格-免费-green?style=flat-square" alt="Free">
