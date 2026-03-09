@@ -103,10 +103,7 @@ final class UpdateChecker: ObservableObject {
         alert.informativeText = L.noUpdateMsg(appVersion)
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
-        NSApp.setActivationPolicy(.accessory)
     }
 
     func showUpdateAlertPublic() {
@@ -125,7 +122,6 @@ final class UpdateChecker: ObservableObject {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         let resp = alert.runModal()
-        NSApp.setActivationPolicy(.accessory)
         if resp == .alertFirstButtonReturn {
             startDownload()
         }
@@ -179,7 +175,6 @@ final class UpdateChecker: ObservableObject {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         let resp = alert.runModal()
-        NSApp.setActivationPolicy(.accessory)
         if resp == .alertFirstButtonReturn {
             NSWorkspace.shared.open(file)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
