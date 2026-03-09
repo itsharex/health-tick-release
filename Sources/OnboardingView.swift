@@ -284,7 +284,7 @@ struct OnboardingView: View {
                             .foregroundStyle(.green)
                             .frame(width: 65, alignment: .trailing)
                     }
-                    Slider(value: $workInterval, in: 30...90, step: 5)
+                    Slider(value: $workInterval, in: 10...90, step: 5)
                         .tint(.green)
                 }
 

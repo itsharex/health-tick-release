@@ -3,19 +3,19 @@ import Combine
 import AppKit
 
 enum BreakPosition: String, CaseIterable, Equatable {
+    case menuWindow = "menu_window"
     case topRight = "top_right"
     case topLeft = "top_left"
     case center = "center"
     case fullscreen = "fullscreen"
-    case menuWindow = "menu_window"
 
     var label: String {
         switch self {
+        case .menuWindow: return L.posMenuWindow
         case .topRight: return L.posTopRight
         case .topLeft: return L.posTopLeft
         case .center: return L.posCenter
         case .fullscreen: return L.posFullscreen
-        case .menuWindow: return L.posMenuWindow
         }
     }
 }
@@ -159,6 +159,7 @@ final class AppState: ObservableObject {
     @Published var isInQuietHours: Bool = false
     @Published var showOnboarding: Bool = false
     @Published var currentBreakActivity: BreakActivity?
+    @Published var currentReminder: String?
 
     private var currentSessionId: Int64?
     private var breakStartDate: Date?
@@ -250,7 +251,7 @@ final class AppState: ObservableObject {
     // MARK: - Work Done -> Alert
 
     private func onWorkDone() {
-        let reminder = config.reminders.randomElement() ?? L.defaultBreakReminder
+        currentReminder = config.reminders.randomElement() ?? L.defaultBreakReminder
         playSound()
 
         if config.breakConfirm {
@@ -260,24 +261,16 @@ final class AppState: ObservableObject {
                 guard let self else { return }
                 Task { @MainActor [weak self] in self?.playSound() }
             }
-            showBreakAlert(reminder)
+            overlayManager.pinForAlert()
         } else {
             startBreak()
         }
     }
 
-    private func showBreakAlert(_ message: String) {
-        let alert = NSAlert()
-        alert.messageText = L.healthCheckIn
-        alert.informativeText = message
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: L.alertConfirmBreak)
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
-        NSApp.setActivationPolicy(.accessory)
+    func confirmBreak() {
         alertRepeatTimer?.invalidate()
         alertRepeatTimer = nil
+        overlayManager.dismissMenuPanel()
         startBreak()
     }
 
@@ -289,6 +282,7 @@ final class AppState: ObservableObject {
         breakSkipCount = 0
         breakStartDate = Date()
         currentBreakActivity = breakActivities.randomElement()
+        currentReminder = config.reminders.randomElement()
         let secs = config.breakMinutes * 60
         remainingSeconds = secs
 
@@ -298,12 +292,10 @@ final class AppState: ObservableObject {
         }
 
         if config.breakPosition == .menuWindow {
-            // Menu window mode: overlay manages idle-aware countdown
             overlayManager.showMenuWindow(seconds: secs)
         } else {
-            targetTime = Date().addingTimeInterval(Double(secs))
+            overlayManager.dismissMenuPanel()
             overlayManager.show(seconds: secs)
-            startTicking()
         }
     }
 
@@ -311,7 +303,12 @@ final class AppState: ObservableObject {
         phase = .waiting
         remainingSeconds = 0
         breakWarning = ""
-        overlayManager.hide()
+        // For fullscreen: close overlay, pin menu bar to show waiting UI
+        // For floating/menuWindow: keep panels open, SwiftUI shows waiting content
+        if config.breakPosition == .fullscreen {
+            overlayManager.hide()
+            overlayManager.pinForAlert()
+        }
 
         let actualSeconds: Int?
         if let start = breakStartDate {
@@ -328,6 +325,7 @@ final class AppState: ObservableObject {
     }
 
     func confirmReturn() {
+        overlayManager.hideAll()
         startWork()
     }
 
@@ -389,8 +387,9 @@ final class AppState: ObservableObject {
 
         if suppressNextRestartPrompt {
             suppressNextRestartPrompt = false
-        } else if (newConfig.workMinutes != old.workMinutes && (phase == .working || phase == .paused)) ||
-           (newConfig.breakMinutes != old.breakMinutes && phase == .breaking) {
+        } else if !isInQuietHours &&
+           ((newConfig.workMinutes != old.workMinutes && (phase == .working || phase == .paused)) ||
+            (newConfig.breakMinutes != old.breakMinutes && phase == .breaking)) {
             showRestartPrompt = true
         }
 
@@ -418,6 +417,7 @@ final class AppState: ObservableObject {
         overlayManager.hide()
         pausedPhase = nil
         startWork()
+        checkQuietHours()
     }
 
     // MARK: - Helpers

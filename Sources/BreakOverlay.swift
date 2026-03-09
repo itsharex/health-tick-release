@@ -1,9 +1,178 @@
 import AppKit
+import SwiftUI
 import Foundation
+
+// MARK: - Shared Break Card View (single source of truth for ALL break UIs)
+
+struct BreakCardView: View {
+    @EnvironmentObject var state: AppState
+    var fullscreen: Bool = false
+
+    private var timerProgress: Double {
+        guard state.phase == .breaking else { return 0 }
+        let total = state.config.breakMinutes * 60
+        guard total > 0 else { return 0 }
+        return Double(state.remainingSeconds) / Double(total)
+    }
+
+    var body: some View {
+        VStack(spacing: fullscreen ? 20 : 12) {
+            switch state.phase {
+            case .alerting:
+                alertingBody
+            case .waiting:
+                waitingBody
+            case .breaking:
+                breakBody
+            default:
+                EmptyView()
+            }
+        }
+        .padding(fullscreen ? 40 : 16)
+        .frame(width: fullscreen ? nil : 240)
+    }
+
+    // MARK: - Alerting (pre-break confirmation)
+
+    @ViewBuilder
+    private var alertingBody: some View {
+        Image(systemName: "bell.badge.fill")
+            .font(.system(size: fullscreen ? 64 : 44))
+            .foregroundStyle(.orange)
+            .padding(.top, fullscreen ? 16 : 8)
+
+        if let reminder = state.currentReminder {
+            Text(reminder)
+                .font(fullscreen ? .title3.bold() : .callout.bold())
+                .foregroundStyle(fullscreen ? .white.opacity(0.85) : .primary.opacity(0.8))
+                .multilineTextAlignment(.center)
+        }
+
+        Button {
+            state.confirmBreak()
+        } label: {
+            Text(L.alertConfirmBreak)
+                .font(.system(size: fullscreen ? 18 : 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: fullscreen ? 280 : .infinity)
+                .padding(.vertical, fullscreen ? 12 : 8)
+                .background(.orange.gradient, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, fullscreen ? 0 : 20)
+    }
+
+    // MARK: - Break content (circular timer)
+
+    @ViewBuilder
+    private var breakBody: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.gray.opacity(fullscreen ? 0.3 : 0.2), lineWidth: fullscreen ? 5 : 3)
+            Circle()
+                .trim(from: 0, to: timerProgress)
+                .stroke(
+                    Color.orange.gradient,
+                    style: StrokeStyle(lineWidth: fullscreen ? 5 : 3, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: fullscreen ? 6 : 2) {
+                Text(state.formattedTime)
+                    .font(.system(size: fullscreen ? 64 : 28, weight: .light, design: .monospaced))
+                    .foregroundStyle(fullscreen ? .white : .primary)
+                Text(state.phaseLabel)
+                    .font(.system(size: fullscreen ? 18 : 13))
+                    .foregroundStyle(fullscreen ? .white.opacity(0.5) : .primary.opacity(0.6))
+            }
+        }
+        .frame(width: fullscreen ? 240 : 120, height: fullscreen ? 240 : 120)
+        .padding(.top, fullscreen ? 8 : 4)
+
+        if let reminder = state.currentReminder {
+            Text(reminder)
+                .font(fullscreen ? .title3.bold() : .callout.bold())
+                .foregroundStyle(fullscreen ? .white.opacity(0.85) : .primary.opacity(0.7))
+                .multilineTextAlignment(.center)
+        }
+
+        if let activity = state.currentBreakActivity {
+            HStack(spacing: fullscreen ? 8 : 6) {
+                Image(systemName: activity.icon)
+                    .font(.system(size: fullscreen ? 18 : 14))
+                    .foregroundStyle(.orange)
+                Text(activity.text)
+                    .font(fullscreen ? .title3 : .callout)
+                    .foregroundStyle(.orange)
+            }
+        }
+
+        if !state.breakWarning.isEmpty {
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: fullscreen ? 14 : 11))
+                    .foregroundStyle(.orange)
+                Text(state.breakWarning)
+                    .font(fullscreen ? .callout : .caption)
+                    .foregroundStyle(.orange)
+            }
+            .padding(.horizontal, fullscreen ? 14 : 10)
+            .padding(.vertical, fullscreen ? 6 : 4)
+            .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+        }
+
+        Button {
+            state.skipBreakClicked()
+        } label: {
+            Text(L.skipButton(state.breakSkipCount, state.breakSkipNeeded))
+                .font(.system(size: fullscreen ? 14 : 11, weight: .medium))
+                .foregroundStyle(fullscreen ? .white.opacity(0.4) : .secondary)
+                .padding(.horizontal, fullscreen ? 20 : 12)
+                .padding(.vertical, fullscreen ? 8 : 4)
+                .background(
+                    Color.gray.opacity(fullscreen ? 0.25 : 0.15),
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
+        }
+        .buttonStyle(.borderless)
+    }
+
+    // MARK: - Waiting (post-break confirmation)
+
+    @ViewBuilder
+    private var waitingBody: some View {
+        Image(systemName: "checkmark.circle.fill")
+            .font(.system(size: fullscreen ? 64 : 44))
+            .foregroundStyle(.green)
+            .padding(.top, fullscreen ? 16 : 8)
+
+        Text(L.breakOverReturnPrompt)
+            .font(fullscreen ? .title3 : .callout)
+            .foregroundStyle(fullscreen ? .white.opacity(0.7) : .secondary)
+            .multilineTextAlignment(.center)
+
+        Button {
+            state.confirmReturn()
+        } label: {
+            Text(L.alertImBack)
+                .font(.system(size: fullscreen ? 18 : 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: fullscreen ? 280 : .infinity)
+                .padding(.vertical, fullscreen ? 12 : 8)
+                .background(.green.gradient, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, fullscreen ? 0 : 20)
+    }
+}
+
+// MARK: - Panel
 
 private class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
+
+// MARK: - Idle Detection
 
 func getUserIdleSeconds() -> Double {
     let process = Process()
@@ -26,16 +195,13 @@ func getUserIdleSeconds() -> Double {
     return 0
 }
 
+// MARK: - Overlay Manager
+
 @MainActor
 final class BreakOverlayManager {
     private var windows: [NSPanel] = []
     private var timer: Timer?
-    private var countdownLabel: NSTextField?
-    private var warningLabel: NSTextField?
-    private var skipButton: NSButton?
     private var remaining: Int = 0
-    private var skipClickCount: Int = 0
-    private let skipClicksNeeded = 3
     weak var appState: AppState?
     var onForceEnd: (() -> Void)?
     var onBreakDone: (() -> Void)?
@@ -49,7 +215,6 @@ final class BreakOverlayManager {
 
     func show(seconds: Int) {
         remaining = seconds
-        skipClickCount = 0
         isMenuWindowMode = false
         let position = appState?.config.breakPosition ?? .topRight
         if position == .fullscreen {
@@ -62,11 +227,9 @@ final class BreakOverlayManager {
 
     func showMenuWindow(seconds: Int) {
         remaining = seconds
-        skipClickCount = 0
         isMenuWindowMode = true
         startMonitoring()
 
-        // Find and pin the MenuBarExtra panel
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.pinMenuBarExtra()
         }
@@ -77,11 +240,62 @@ final class BreakOverlayManager {
         timer = nil
         for w in windows { w.orderOut(nil) }
         windows.removeAll()
-        countdownLabel = nil
-        warningLabel = nil
-        skipButton = nil
         unpinMenuBarExtra()
         isMenuWindowMode = false
+    }
+
+    func hideAll() {
+        hide()
+        closeMenuBarExtra()
+    }
+
+    func dismissMenuPanel() {
+        unpinMenuBarExtra()
+        isMenuWindowMode = false
+        closeMenuBarExtra()
+    }
+
+    func pinForAlert() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.pinMenuBarExtra()
+        }
+    }
+
+    func preview(position: BreakPosition) {
+        hide()
+        remaining = 65
+
+        let savedActivity = appState?.currentBreakActivity
+        let savedReminder = appState?.currentReminder
+        let savedPhase = appState?.phase
+        let savedRemaining = appState?.remainingSeconds
+        let savedWarning = appState?.breakWarning
+
+        appState?.currentBreakActivity = breakActivities.randomElement()
+        appState?.currentReminder = appState?.config.reminders.randomElement() ?? L.defaultBreakReminder
+        appState?.phase = .breaking
+        appState?.remainingSeconds = remaining
+        appState?.breakWarning = ""
+
+        if position == .menuWindow {
+            isMenuWindowMode = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.pinMenuBarExtra()
+            }
+        } else if position == .fullscreen {
+            createFullscreen()
+        } else {
+            createFloating(position: position)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.hide()
+            self?.appState?.currentBreakActivity = savedActivity
+            self?.appState?.currentReminder = savedReminder
+            self?.appState?.phase = savedPhase ?? .working
+            self?.appState?.remainingSeconds = savedRemaining ?? 0
+            self?.appState?.breakWarning = savedWarning ?? ""
+        }
     }
 
     // MARK: - Menu window pinning
@@ -100,9 +314,7 @@ final class BreakOverlayManager {
     private func findMenuBarExtraPanel() {
         for window in NSApp.windows {
             guard let panel = window as? NSPanel else { continue }
-            // Skip our own overlay panels
             if panel is KeyablePanel { continue }
-            // MenuBarExtra .window style creates an NSPanel with these characteristics
             if panel.styleMask.contains(.nonactivatingPanel)
                 && panel.styleMask.contains(.fullSizeContentView)
                 && panel.frame.width < 350 {
@@ -123,7 +335,6 @@ final class BreakOverlayManager {
             panel.level = .floating
             return
         }
-        // Panel lost or hidden, try to find it again
         findMenuBarExtraPanel()
     }
 
@@ -140,13 +351,32 @@ final class BreakOverlayManager {
         originalHidesOnDeactivate = nil
     }
 
-    // MARK: - Floating window
+    private func closeMenuBarExtra() {
+        for window in NSApp.windows {
+            guard let panel = window as? NSPanel else { continue }
+            if panel is KeyablePanel { continue }
+            if panel.styleMask.contains(.nonactivatingPanel),
+               panel.styleMask.contains(.fullSizeContentView),
+               panel.frame.width < 350 {
+                panel.orderOut(nil)
+                break
+            }
+        }
+    }
+
+    // MARK: - Floating window (SwiftUI BreakCardView)
 
     private func createFloating(position: BreakPosition) {
-        guard let screen = NSScreen.main else { return }
+        guard let screen = NSScreen.main, let state = appState else { return }
 
-        let pw: CGFloat = 280
-        let ph: CGFloat = 160
+        // Auto-size from SwiftUI content
+        let cardView = BreakCardView()
+            .environmentObject(state)
+        let sizingView = NSHostingView(rootView: cardView)
+        let fitted = sizingView.fittingSize
+        let pw = ceil(fitted.width)
+        let ph = ceil(fitted.height)
+
         let margin: CGFloat = 20
         let vis = screen.visibleFrame
 
@@ -168,25 +398,32 @@ final class BreakOverlayManager {
 
         let p = KeyablePanel(
             contentRect: NSMakeRect(x, y, pw, ph),
-            styleMask: [.titled, .nonactivatingPanel, .hudWindow],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         p.level = .floating
+        p.isOpaque = false
+        p.backgroundColor = .clear
         p.isMovableByWindowBackground = true
-        p.title = L.phaseBreaking
-        p.titlebarAppearsTransparent = true
+        p.hasShadow = true
 
-        let content = p.contentView!
-        layoutContent(in: content, width: pw, compact: true)
+        let hostingView = NSHostingView(
+            rootView: cardView
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        )
+        hostingView.frame = NSMakeRect(0, 0, pw, ph)
+        p.contentView!.addSubview(hostingView)
 
         p.makeKeyAndOrderFront(nil)
         windows.append(p)
     }
 
-    // MARK: - Fullscreen
+    // MARK: - Fullscreen (SwiftUI BreakCardView on dark background)
 
     private func createFullscreen() {
+        guard let state = appState else { return }
+
         for screen in NSScreen.screens {
             let frame = screen.frame
             let p = KeyablePanel(
@@ -197,50 +434,17 @@ final class BreakOverlayManager {
             )
             p.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
             p.isOpaque = false
-            p.alphaValue = 0.92
-            p.backgroundColor = NSColor(calibratedRed: 0.08, green: 0.08, blue: 0.1, alpha: 0.92)
+            p.backgroundColor = NSColor.black.withAlphaComponent(0.75)
             p.ignoresMouseEvents = false
 
-            let content = p.contentView!
-            let w = frame.size.width
-            let h = frame.size.height
-            let cy = h / 2
+            let fullscreenView = BreakCardView(fullscreen: true)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .environmentObject(state)
 
-            let title = makeLabel(L.breakTimeTitle, frame: NSMakeRect(0, cy + 60, w, 44), size: 36)
-            title.font = NSFont.systemFont(ofSize: 36, weight: .medium)
-            title.textColor = .white
-            content.addSubview(title)
-
-            let countdown = makeLabel(formatTime(remaining), frame: NSMakeRect(0, cy - 10, w, 60), size: 52)
-            countdown.font = NSFont.monospacedSystemFont(ofSize: 52, weight: .light)
-            countdown.textColor = .white
-            content.addSubview(countdown)
-            if countdownLabel == nil { countdownLabel = countdown }
-
-            let breakMsg: String
-            if let activity = appState?.currentBreakActivity {
-                breakMsg = activity.text
-            } else {
-                breakMsg = L.breakLeaveMsg
-            }
-            let msg = makeLabel(breakMsg, frame: NSMakeRect(0, cy - 65, w, 30), size: 18)
-            msg.textColor = NSColor(white: 0.7, alpha: 1)
-            content.addSubview(msg)
-
-            let warn = makeLabel("", frame: NSMakeRect(0, cy - 100, w, 26), size: 16)
-            warn.textColor = NSColor.systemOrange
-            content.addSubview(warn)
-            if warningLabel == nil { warningLabel = warn }
-
-            let btn = NSButton(frame: NSMakeRect(w / 2 - 70, cy - 150, 140, 32))
-            btn.title = L.skipButton(0, skipClicksNeeded)
-            btn.bezelStyle = .rounded
-            btn.font = NSFont.systemFont(ofSize: 13)
-            btn.contentTintColor = NSColor(white: 0.5, alpha: 1)
-            btn.target = self
-            btn.action = #selector(skipClicked)
-            content.addSubview(btn)
-            if skipButton == nil { skipButton = btn }
+            let hostingView = NSHostingView(rootView: fullscreenView)
+            hostingView.frame = frame
+            hostingView.autoresizingMask = [.width, .height]
+            p.contentView!.addSubview(hostingView)
 
             p.makeKeyAndOrderFront(nil)
             windows.append(p)
@@ -248,49 +452,7 @@ final class BreakOverlayManager {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // MARK: - Compact layout for floating
-
-    private func layoutContent(in content: NSView, width pw: CGFloat, compact: Bool) {
-        let countdown = makeLabel(formatTime(remaining), frame: NSMakeRect(0, 80, pw, 48), size: 38)
-        countdown.font = NSFont.monospacedSystemFont(ofSize: 38, weight: .light)
-        countdown.textColor = .white
-        content.addSubview(countdown)
-        if countdownLabel == nil { countdownLabel = countdown }
-
-        let floatMsg: String
-        if let activity = appState?.currentBreakActivity {
-            floatMsg = activity.text
-        } else {
-            floatMsg = L.breakFloatMsg
-        }
-        let msg = makeLabel(floatMsg, frame: NSMakeRect(0, 58, pw, 20), size: 12)
-        msg.textColor = NSColor.secondaryLabelColor
-        content.addSubview(msg)
-
-        let warn = makeLabel("", frame: NSMakeRect(0, 38, pw, 18), size: 11)
-        warn.textColor = NSColor.systemOrange
-        content.addSubview(warn)
-        if warningLabel == nil { warningLabel = warn }
-
-        let btn = NSButton(frame: NSMakeRect(pw / 2 - 55, 6, 110, 26))
-        btn.title = L.skipButton(0, skipClicksNeeded)
-        btn.bezelStyle = .rounded
-        btn.font = NSFont.systemFont(ofSize: 11)
-        btn.contentTintColor = NSColor.tertiaryLabelColor
-        btn.target = self
-        btn.action = #selector(skipClicked)
-        content.addSubview(btn)
-        if skipButton == nil { skipButton = btn }
-    }
-
-    @objc private func skipClicked() {
-        skipClickCount += 1
-        if skipClickCount >= skipClicksNeeded {
-            onForceEnd?()
-        } else {
-            skipButton?.title = L.skipButton(skipClickCount, skipClicksNeeded)
-        }
-    }
+    // MARK: - Monitoring
 
     private func startMonitoring() {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -302,49 +464,20 @@ final class BreakOverlayManager {
     private func monitorTick() {
         let idle = getUserIdleSeconds()
         if idle < 3 && remaining > 0 {
-            if isMenuWindowMode {
-                appState?.breakWarning = L.breakDetectedPause
-            }
-            warningLabel?.stringValue = L.breakDetectedPause
+            appState?.breakWarning = L.breakDetectedPause
             appState?.playBreakDetectSound()
         } else {
-            if isMenuWindowMode {
-                appState?.breakWarning = ""
-            }
-            warningLabel?.stringValue = ""
+            appState?.breakWarning = ""
             remaining -= 1
         }
 
-        // Menu window mode: update AppState's remainingSeconds and handle completion
-        if isMenuWindowMode {
-            appState?.remainingSeconds = max(0, remaining)
-            if remaining <= 0 {
-                timer?.invalidate()
-                timer = nil
-                unpinMenuBarExtra()
-                onBreakDone?()
-                return
-            }
+        appState?.remainingSeconds = max(0, remaining)
+
+        if remaining <= 0 {
+            timer?.invalidate()
+            timer = nil
+            onBreakDone?()
+            return
         }
-
-        countdownLabel?.stringValue = formatTime(remaining)
-    }
-
-    private func formatTime(_ s: Int) -> String {
-        let m = max(0, s) / 60
-        let sec = max(0, s) % 60
-        return String(format: "%02d:%02d", m, sec)
-    }
-
-    private func makeLabel(_ text: String, frame: NSRect, size: CGFloat) -> NSTextField {
-        let label = NSTextField(frame: frame)
-        label.stringValue = text
-        label.isBezeled = false
-        label.drawsBackground = false
-        label.isEditable = false
-        label.isSelectable = false
-        label.alignment = .center
-        label.font = NSFont.systemFont(ofSize: size)
-        return label
     }
 }

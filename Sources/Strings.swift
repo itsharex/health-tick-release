@@ -99,6 +99,7 @@ struct L {
     static var unitMinutes: String { isZh ? "分钟" : "min" }
     static var unitTimes: String { isZh ? "次" : "times" }
     static var breakWindow: String { isZh ? "休息窗口" : "Break Window" }
+    static var preview: String { isZh ? "预览" : "Preview" }
     static var breakConfirm: String { isZh ? "休息前确认" : "Confirm Before Break" }
     static var reminderSound: String { isZh ? "提醒声音" : "Reminder Sound" }
     static var activityDetectSound: String { isZh ? "操作检测提示音" : "Activity Detection Sound" }

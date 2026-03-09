@@ -4,12 +4,9 @@ struct MenuView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.openWindow) private var openWindow
 
-    private var isMenuWindowBreak: Bool {
-        state.phase == .breaking && state.config.breakPosition == .menuWindow
-    }
-
-    private var isWaiting: Bool {
-        state.phase == .waiting
+    /// Whether to show the shared BreakCardView (alerting, breaking, or waiting)
+    private var isBreakPhase: Bool {
+        state.phase == .alerting || state.phase == .breaking || state.phase == .waiting
     }
 
     var body: some View {
@@ -29,11 +26,11 @@ struct MenuView: View {
                 .background(.purple.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
             }
 
-            // Waiting confirmation UI
-            if isWaiting {
-                waitingContent
+            if isBreakPhase {
+                // Shared break/alerting/waiting UI (same component used by floating & fullscreen)
+                BreakCardView()
             } else {
-                // Circular timer
+                // Normal working/paused state
                 ZStack {
                     Circle()
                         .stroke(.quaternary, lineWidth: 3)
@@ -56,23 +53,10 @@ struct MenuView: View {
                 .frame(width: 120, height: 120)
                 .padding(.top, 4)
 
-                // Menu window break: show break-specific content
-                if isMenuWindowBreak {
-                    menuWindowBreakContent
-                } else {
-                    normalContent
-                }
-            }
+                normalContent
 
-            Divider().padding(.horizontal, 4)
+                Divider().padding(.horizontal, 4)
 
-            // Controls
-            if isWaiting {
-                // No controls in waiting state — just the confirm button above
-                EmptyView()
-            } else if isMenuWindowBreak {
-                menuWindowBreakControls
-            } else {
                 normalControls
             }
 
@@ -92,88 +76,6 @@ struct MenuView: View {
         .frame(width: 240)
         .onAppear {
             bringOtherWindowsToFront()
-        }
-    }
-
-    // MARK: - Waiting Content
-
-    private var waitingContent: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(.green)
-                .padding(.top, 8)
-
-            Text(L.breakOverReturnPrompt)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button {
-                state.confirmReturn()
-            } label: {
-                Text(L.alertImBack)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(.green.gradient, in: RoundedRectangle(cornerRadius: 8))
-            }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 20)
-        }
-    }
-
-    // MARK: - Menu Window Break Content
-
-    private var menuWindowBreakContent: some View {
-        VStack(spacing: 8) {
-            if let activity = state.currentBreakActivity {
-                HStack(spacing: 6) {
-                    Image(systemName: activity.icon)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.orange)
-                    Text(activity.text)
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                }
-            } else {
-                Text(L.breakFloatMsg)
-                    .font(.callout)
-                    .foregroundStyle(.orange)
-            }
-
-            if !state.breakWarning.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.orange)
-                    Text(state.breakWarning)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
-            }
-        }
-    }
-
-    private var menuWindowBreakControls: some View {
-        HStack {
-            Spacer()
-            Button {
-                state.skipBreakClicked()
-            } label: {
-                Text(L.skipButton(state.breakSkipCount, state.breakSkipNeeded))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.borderless)
-            Spacer()
         }
     }
 
@@ -293,7 +195,6 @@ struct MenuView: View {
             ) {
                 state.togglePause()
             }
-            .disabled(state.phase == .alerting || state.phase == .waiting)
 
             controlButton(title: L.resetAction, icon: "arrow.counterclockwise") {
                 state.reset()
@@ -327,13 +228,11 @@ struct MenuView: View {
         let total: Int
         if state.phase == .working || (state.phase == .paused && state.remainingSeconds > 0) {
             total = state.config.workMinutes * 60
-        } else if state.phase == .breaking {
-            total = state.config.breakMinutes * 60
         } else {
             return 0
         }
         guard total > 0 else { return 0 }
-        return 1.0 - Double(state.remainingSeconds) / Double(total)
+        return Double(state.remainingSeconds) / Double(total)
     }
 
     private var phaseColor: Color {

@@ -231,6 +231,7 @@ struct SystemTab: View {
 
 struct AppTab: View {
     @EnvironmentObject var state: AppState
+    @State private var showQuietHelp = false
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -265,6 +266,14 @@ struct AppTab: View {
                             }
                         }
                         .labelsHidden()
+                        Button {
+                            state.overlayManager.preview(position: state.config.breakPosition)
+                        } label: {
+                            Text(L.preview)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.blue)
+                        }
+                        .buttonStyle(.borderless)
                     }
                     Divider().padding(.leading, 44)
                     toggleRow(icon: "hand.raised.fill", label: L.breakConfirm, isOn: $state.config.breakConfirm)
@@ -334,10 +343,20 @@ struct AppTab: View {
                             .frame(width: 20)
                         Text(L.quietHours)
                             .font(.callout)
-                        Image(systemName: "questionmark.circle")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
-                            .help(L.quietHoursHelp)
+                        Button {
+                            showQuietHelp.toggle()
+                        } label: {
+                            Image(systemName: "questionmark.circle")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.borderless)
+                        .popover(isPresented: $showQuietHelp) {
+                            Text(L.quietHoursHelp)
+                                .font(.callout)
+                                .padding(12)
+                                .frame(width: 260)
+                        }
                         Spacer()
                         Button {
                             state.config.quietHours.append(QuietHourPeriod(start: "12:00", end: "13:00"))

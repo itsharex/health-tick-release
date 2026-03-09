@@ -96,7 +96,7 @@ final class Database {
                     }
                 case "sound_enabled": config.soundEnabled = value == "1"
                 case "break_detect_sound": config.breakDetectSound = value == "1"
-                case "break_position": config.breakPosition = BreakPosition(rawValue: value) ?? .topRight
+                case "break_position": config.breakPosition = BreakPosition(rawValue: value) ?? .menuWindow
                 case "break_confirm": config.breakConfirm = value == "1"
                 case "alert_sound": config.alertSound = value
                 case "break_detect_sound_name": config.breakDetectSoundName = value
