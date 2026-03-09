@@ -53,6 +53,7 @@ description: Build and publish a new HealthTick release. Use when the user says 
 
 ## Important
 
+- **NEVER delete a GitHub release to re-upload** — deleting a release permanently erases its download count. If a released DMG has issues, always bump to a new patch version (e.g., 1.3.5 → 1.3.6) and create a fresh release instead.
 - Check tag existence before creating to avoid conflicts
 - Do NOT run build.sh or replace the local app
 - Use `pkill -f "HealthTick Dev.app"` to kill dev version, never `killall HealthTick`
