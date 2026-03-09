@@ -107,6 +107,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var observer: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // One-time cleanup of old window state to fix toolbar style after upgrade
+        if UserDefaults.standard.string(forKey: "windowStateCleaned") != "1" {
+            let oldKeys = ["NSWindow Frame settings", "NSWindow Frame com_apple_SwiftUI_Settings_window", "com_apple_SwiftUI_Settings_selectedTabIndex"]
+            for key in oldKeys {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+            if let domain = UserDefaults(suiteName: "HealthTick") {
+                for key in oldKeys { domain.removeObject(forKey: key) }
+            }
+            UserDefaults.standard.set("1", forKey: "windowStateCleaned")
+        }
+
         let iconPath = Bundle.main.bundlePath + "/Contents/Resources/AppIcon.icns"
         if let icon = NSImage(contentsOfFile: iconPath) {
             NSApp.applicationIconImage = icon
