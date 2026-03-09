@@ -41,6 +41,21 @@
 
 ## 📥 安装
 
+### 方式一：Homebrew（推荐）
+
+```bash
+brew tap lifedever/tap
+brew install --cask health-tick
+```
+
+后续更新：
+
+```bash
+brew upgrade --cask health-tick
+```
+
+### 方式二：手动下载
+
 前往 [Releases](https://github.com/lifedever/health-tick-release/releases/latest) 页面下载最新版本：
 
 1. 下载 **`.dmg`** 文件，打开后将 HealthTick 拖入 Applications 文件夹
