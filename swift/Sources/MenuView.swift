@@ -27,7 +27,7 @@ struct MenuView: View {
                         .font(.system(size: 28, weight: .light, design: .monospaced))
                     Text(state.phaseLabel)
                         .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.6))
                 }
             }
             .frame(width: 120, height: 120)
@@ -56,7 +56,7 @@ struct MenuView: View {
             } label: {
                 Text(L.quitApp)
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.primary.opacity(0.35))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderless)
@@ -119,16 +119,16 @@ struct MenuView: View {
                         .foregroundStyle(.green)
                     Text(L.done)
                         .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
 
                 VStack(spacing: 2) {
                     Text("\(state.config.dailyGoal)")
                         .font(.title3.bold().monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.6))
                     Text(L.goal)
                         .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
 
                 VStack(spacing: 2) {
@@ -142,7 +142,7 @@ struct MenuView: View {
                     }
                     Text(L.streak)
                         .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
             }
 
@@ -160,7 +160,7 @@ struct MenuView: View {
                             )
                         Text(shortDay(item.0))
                             .font(.system(size: 8))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.primary.opacity(0.45))
                     }
                 }
             }
@@ -178,19 +178,19 @@ struct MenuView: View {
                 HStack(spacing: 0) {
                     Text("🎯 \(hint.prefix)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.5))
                     Text(hint.badge)
                         .font(.callout.bold())
                         .foregroundStyle(.green)
                     Text(hint.mid)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.5))
                     Text(hint.count)
                         .font(.caption.bold().monospacedDigit())
                         .foregroundStyle(.orange)
                     Text(hint.suffix)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
             }
 
@@ -282,7 +282,7 @@ struct MenuView: View {
                     .font(.system(size: 9))
             }
             .frame(width: 36, height: 32)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.primary.opacity(0.5))
         }
         .buttonStyle(.borderless)
     }
