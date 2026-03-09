@@ -16,27 +16,27 @@ if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
     exit 1
 fi
 
-# Build universal binary (arm64 + x86_64)
-echo "[1/5] Building universal binary..."
-if swift build -c release --arch arm64 --arch x86_64 2>&1; then
-    BINARY=".build/apple/Products/Release/HealthTick"
-    echo "  Built universal binary (arm64 + x86_64)"
-else
-    echo "  Universal build failed, building arm64 only..."
-    swift build -c release --arch arm64
-    BINARY=".build/arm64-apple-macosx/release/HealthTick"
-    echo "  Built arm64 binary"
-fi
+# Build for each architecture separately
+echo "[1/5] Building binaries..."
+swift build -c release --arch arm64
+echo "  Built arm64"
+swift build -c release --arch x86_64
+echo "  Built x86_64"
 
-# Package app bundles for each architecture label
-echo "[2/5] Packaging app..."
+# Package app bundles
+echo "[2/5] Packaging apps..."
 STAGE="/tmp/health-tick-release-${VERSION}"
 rm -rf "$STAGE"
 
 for label in Apple-Silicon Intel; do
+    if [ "$label" = "Apple-Silicon" ]; then
+        BIN=".build/arm64-apple-macosx/release/HealthTick"
+    else
+        BIN=".build/x86_64-apple-macosx/release/HealthTick"
+    fi
     APP_DIR="${STAGE}/${label}/HealthTick.app/Contents"
     mkdir -p "$APP_DIR/MacOS" "$APP_DIR/Resources"
-    cp "$BINARY" "$APP_DIR/MacOS/"
+    cp "$BIN" "$APP_DIR/MacOS/"
     cp Sources/Info.plist "$APP_DIR/"
     if [ -d "Sources/Resources" ]; then
         cp -R Sources/Resources/* "$APP_DIR/Resources/"
@@ -71,13 +71,13 @@ gh release create "$TAG" \
     --title "HealthTick ${TAG}" \
     --notes "## HealthTick ${TAG}
 
-### Download
+### 下载
 - **Apple Silicon (M1/M2/M3/M4)**: \`HealthTick-${TAG}-Apple-Silicon.dmg\`
 - **Intel**: \`HealthTick-${TAG}-Intel.dmg\`
 
-### Install
-Open the \`.dmg\` file and drag HealthTick to the Applications folder.
-First launch: go to **System Settings -> Privacy & Security** and click \"Open Anyway\"." \
+### 安装方式
+打开 \`.dmg\` 文件，将 HealthTick 拖入 Applications 文件夹。
+首次打开请前往 **系统设置 → 隐私与安全性** 点击\"仍要打开\"。" \
     "${STAGE}/HealthTick-${TAG}-Apple-Silicon.dmg" \
     "${STAGE}/HealthTick-${TAG}-Intel.dmg"
 
