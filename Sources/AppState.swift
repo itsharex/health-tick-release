@@ -235,16 +235,13 @@ final class AppState: ObservableObject {
     }
 
     private func tick() {
-        guard phase == .working || phase == .breaking else { return }
-        // Menu window break: overlay manages countdown with idle detection
-        if phase == .breaking && config.breakPosition == .menuWindow { return }
+        guard phase == .working else { return }
         let newVal = max(0, Int(targetTime.timeIntervalSinceNow))
         if newVal != remainingSeconds {
             remainingSeconds = newVal
         }
         if remainingSeconds <= 0 {
-            if phase == .working { onWorkDone() }
-            else if phase == .breaking { onBreakDone() }
+            onWorkDone()
         }
     }
 
@@ -278,6 +275,7 @@ final class AppState: ObservableObject {
 
     private func startBreak() {
         phase = .breaking
+        timer?.invalidate()  // Stop work timer; overlay manager handles break countdown
         breakWarning = ""
         breakSkipCount = 0
         breakStartDate = Date()
