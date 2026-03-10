@@ -169,6 +169,8 @@ let allBadges: [Badge] = [
 ]
 
 let allTotalBadges: [Badge] = [
+    Badge(days: 10, icon: "📌", isTotal: true),
+    Badge(days: 20, icon: "✌️", isTotal: true),
     Badge(days: 50, icon: "🎖️", isTotal: true),
     Badge(days: 100, icon: "💯", isTotal: true),
     Badge(days: 200, icon: "🎯", isTotal: true),
