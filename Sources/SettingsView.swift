@@ -79,6 +79,7 @@ struct SystemTab: View {
     @Environment(\.openWindow) private var openWindow
     @State private var resetSettingsDone = false
     @State private var resetDataDone = false
+    @State private var exportDone = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -172,6 +173,40 @@ struct SystemTab: View {
                 .padding(.vertical, 6)
                 Divider().padding(.leading, 44)
                 HStack(spacing: 10) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L.exportData)
+                            .font(.callout)
+                        Text(L.exportDataDesc)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if exportDone {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Button {
+                            exportData()
+                        } label: {
+                            Text(L.exportAction)
+                                .font(.caption)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(.blue.gradient, in: Capsule())
+                        }
+                        .buttonStyle(.borderless)
+                        .handCursor()
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                Divider().padding(.leading, 44)
+                HStack(spacing: 10) {
                     Image(systemName: "trash")
                         .font(.callout)
                         .foregroundStyle(.red.opacity(0.7))
@@ -223,6 +258,55 @@ struct SystemTab: View {
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             action()
+        }
+    }
+
+    private func exportData() {
+        // 1. Password input
+        let alert = NSAlert()
+        alert.messageText = L.exportPasswordTitle
+        alert.informativeText = L.exportPasswordMsg
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: L.cancel)
+
+        let passwordField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        passwordField.placeholderString = L.exportPasswordPlaceholder
+        alert.accessoryView = passwordField
+        alert.window.initialFirstResponder = passwordField
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let password = passwordField.stringValue
+        guard !password.isEmpty else {
+            let warn = NSAlert()
+            warn.messageText = L.passwordEmpty
+            warn.alertStyle = .warning
+            warn.runModal()
+            return
+        }
+
+        // 2. Save panel
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = []
+        panel.allowsOtherFileTypes = true
+        panel.nameFieldStringValue = "HealthTick-\(Database.todayString()).htdata"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        // 3. Export
+        do {
+            let data = Database.shared.exportAllData()
+            let encrypted = try DataExporter.export(data: data, password: password)
+            try encrypted.write(to: url)
+            withAnimation { exportDone = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation { exportDone = false }
+            }
+        } catch {
+            let errAlert = NSAlert()
+            errAlert.messageText = L.exportFailed
+            errAlert.informativeText = error.localizedDescription
+            errAlert.alertStyle = .critical
+            errAlert.runModal()
         }
     }
 }

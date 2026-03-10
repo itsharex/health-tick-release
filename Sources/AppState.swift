@@ -216,6 +216,7 @@ final class AppState: ObservableObject {
     @Published var celebrateBadge: Badge?
 
     private var currentSessionId: Int64?
+    private var currentSessionWorkConfig: Int = 0  // work_minutes at session creation
     private var breakStartDate: Date?
     private var targetTime: Date = Date()
     private var pausedRemaining: Int = 0
@@ -288,12 +289,14 @@ final class AppState: ObservableObject {
         switch saved.phase {
         case "working" where secs > 0:
             phase = .working
+            currentSessionWorkConfig = config.workMinutes
             remainingSeconds = secs
             targetTime = Date().addingTimeInterval(Double(secs))
             currentSessionId = db.startSession(workMinutes: config.workMinutes, breakMinutes: config.breakMinutes, dailyGoal: config.dailyGoal)
             startTicking()
         case "paused" where secs > 0:
             phase = .paused
+            currentSessionWorkConfig = config.workMinutes
             pausedRemaining = secs
             pausedPhase = .working
             remainingSeconds = secs
@@ -318,6 +321,7 @@ final class AppState: ObservableObject {
 
     func startWork() {
         phase = .working
+        currentSessionWorkConfig = config.workMinutes
         targetTime = Date().addingTimeInterval(Double(config.workMinutes * 60))
         remainingSeconds = config.workMinutes * 60
         currentSessionId = db.startSession(workMinutes: config.workMinutes, breakMinutes: config.breakMinutes, dailyGoal: config.dailyGoal)
@@ -341,7 +345,14 @@ final class AppState: ObservableObject {
         }
         // Refresh work minutes every 60 seconds
         if Date().timeIntervalSince(lastWorkMinutesRefresh) >= 60 {
-            todayWorkMinutes = db.todayWorkMinutes()
+            let dbMinutes = db.todayWorkMinutes()
+            let sessionMinutes = currentSessionWorkMinutes
+            todayWorkMinutes = dbMinutes + sessionMinutes
+            // Sync today's entry in week work data for the chart
+            let today = Database.todayString()
+            if let idx = weekWorkData.firstIndex(where: { $0.0 == today }) {
+                weekWorkData[idx].1 = dbMinutes + sessionMinutes
+            }
             lastWorkMinutesRefresh = Date()
         }
         if remainingSeconds <= 0 {
@@ -496,8 +507,26 @@ final class AppState: ObservableObject {
         maxStreak = db.maxStreakDays(goal: config.dailyGoal)
         weekData = db.recent7DaysCounts()
         totalCount = db.totalCount()
-        todayWorkMinutes = db.todayWorkMinutes()
+        todayWorkMinutes = db.todayWorkMinutes() + currentSessionWorkMinutes
         weekWorkData = db.recent7DaysWorkMinutes()
+        // Add current session's contribution to today's entry in week data
+        if currentSessionWorkMinutes > 0 {
+            let today = Database.todayString()
+            if let idx = weekWorkData.firstIndex(where: { $0.0 == today }) {
+                weekWorkData[idx].1 += currentSessionWorkMinutes
+            }
+        }
+    }
+
+    /// Accurate work minutes for the current in-progress session, calculated from timer state
+    private var currentSessionWorkMinutes: Int {
+        guard currentSessionId != nil else { return 0 }
+        if phase == .working {
+            return max(0, currentSessionWorkConfig * 60 - remainingSeconds) / 60
+        } else if phase == .paused, pausedPhase == .working {
+            return max(0, currentSessionWorkConfig * 60 - pausedRemaining) / 60
+        }
+        return 0
     }
 
     private func detectNewBadge(oldStreak: Int, oldTotal: Int) -> Badge? {

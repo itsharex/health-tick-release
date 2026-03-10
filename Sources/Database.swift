@@ -386,7 +386,8 @@ final class Database {
 
     private func workMinutesForDate(_ date: String) -> Int {
         var stmt: OpaquePointer?
-        let sql = "SELECT work_start, work_end, work_minutes FROM sessions WHERE date = '\(date)'"
+        // Only count completed sessions (work_end IS NOT NULL)
+        let sql = "SELECT work_start, work_end, work_minutes FROM sessions WHERE date = '\(date)' AND work_end IS NOT NULL"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
         defer { sqlite3_finalize(stmt) }
         let iso = ISO8601DateFormatter()
@@ -395,17 +396,9 @@ final class Database {
             let startStr = String(cString: sqlite3_column_text(stmt, 0))
             guard let start = iso.date(from: startStr) else { continue }
             let configuredMinutes = Int(sqlite3_column_int(stmt, 2))
-            let elapsed: Int
-            if sqlite3_column_type(stmt, 1) != SQLITE_NULL {
-                let endStr = String(cString: sqlite3_column_text(stmt, 1))
-                let end = iso.date(from: endStr) ?? start
-                elapsed = max(0, Int(end.timeIntervalSince(start) / 60))
-            } else {
-                // work_end is NULL: in-progress or abandoned session
-                // Cap at configured work_minutes to avoid inflated values
-                let raw = max(0, Int(Date().timeIntervalSince(start) / 60))
-                elapsed = min(raw, configuredMinutes)
-            }
+            let endStr = String(cString: sqlite3_column_text(stmt, 1))
+            let end = iso.date(from: endStr) ?? start
+            let elapsed = min(max(0, Int(end.timeIntervalSince(start) / 60)), configuredMinutes)
             total += elapsed
         }
         return total
@@ -427,22 +420,17 @@ final class Database {
 
         var map: [String: Int] = [:]
         var stmt: OpaquePointer?
-        let sql = "SELECT date, work_start, work_end, work_minutes FROM sessions WHERE date >= '\(start)'"
+        // Only count completed sessions (work_end IS NOT NULL)
+        let sql = "SELECT date, work_start, work_end, work_minutes FROM sessions WHERE date >= '\(start)' AND work_end IS NOT NULL"
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             while sqlite3_step(stmt) == SQLITE_ROW {
                 let d = String(cString: sqlite3_column_text(stmt, 0))
                 let startStr = String(cString: sqlite3_column_text(stmt, 1))
                 guard let startDate = iso.date(from: startStr) else { continue }
                 let configuredMinutes = Int(sqlite3_column_int(stmt, 3))
-                let elapsed: Int
-                if sqlite3_column_type(stmt, 2) != SQLITE_NULL {
-                    let endStr = String(cString: sqlite3_column_text(stmt, 2))
-                    let endDate = iso.date(from: endStr) ?? startDate
-                    elapsed = max(0, Int(endDate.timeIntervalSince(startDate) / 60))
-                } else {
-                    let raw = max(0, Int(Date().timeIntervalSince(startDate) / 60))
-                    elapsed = min(raw, configuredMinutes)
-                }
+                let endStr = String(cString: sqlite3_column_text(stmt, 2))
+                let endDate = iso.date(from: endStr) ?? startDate
+                let elapsed = min(max(0, Int(endDate.timeIntervalSince(startDate) / 60)), configuredMinutes)
                 map[d, default: 0] += elapsed
             }
         }
@@ -567,6 +555,80 @@ final class Database {
     func resetConfig() {
         exec("DELETE FROM config")
         createTables()
+    }
+
+    // MARK: - Export
+
+    func exportAllData() -> [String: Any] {
+        let iso = ISO8601DateFormatter()
+        var result: [String: Any] = [
+            "version": 1,
+            "exportDate": iso.string(from: Date())
+        ]
+
+        // Records
+        var records: [[String: Any]] = []
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "SELECT id, timestamp, date FROM records ORDER BY id", -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let id = Int(sqlite3_column_int64(stmt, 0))
+                let ts = String(cString: sqlite3_column_text(stmt, 1))
+                let date = String(cString: sqlite3_column_text(stmt, 2))
+                records.append(["id": id, "timestamp": ts, "date": date])
+            }
+        }
+        sqlite3_finalize(stmt)
+        result["records"] = records
+
+        // Sessions
+        var sessions: [[String: Any]] = []
+        stmt = nil
+        if sqlite3_prepare_v2(db, "SELECT id, date, work_start, work_end, work_minutes, break_start, break_end, break_minutes, break_actual_seconds, skipped, daily_goal FROM sessions ORDER BY id", -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                var s: [String: Any] = [
+                    "id": Int(sqlite3_column_int64(stmt, 0)),
+                    "date": String(cString: sqlite3_column_text(stmt, 1)),
+                    "work_start": String(cString: sqlite3_column_text(stmt, 2)),
+                    "work_minutes": Int(sqlite3_column_int(stmt, 4)),
+                    "break_minutes": Int(sqlite3_column_int(stmt, 7)),
+                    "skipped": Int(sqlite3_column_int(stmt, 9)),
+                    "daily_goal": Int(sqlite3_column_int(stmt, 10))
+                ]
+                if sqlite3_column_type(stmt, 3) != SQLITE_NULL {
+                    s["work_end"] = String(cString: sqlite3_column_text(stmt, 3))
+                }
+                if sqlite3_column_type(stmt, 5) != SQLITE_NULL {
+                    s["break_start"] = String(cString: sqlite3_column_text(stmt, 5))
+                }
+                if sqlite3_column_type(stmt, 6) != SQLITE_NULL {
+                    s["break_end"] = String(cString: sqlite3_column_text(stmt, 6))
+                }
+                if sqlite3_column_type(stmt, 8) != SQLITE_NULL {
+                    s["break_actual_seconds"] = Int(sqlite3_column_int(stmt, 8))
+                }
+                sessions.append(s)
+            }
+        }
+        sqlite3_finalize(stmt)
+        result["sessions"] = sessions
+
+        // Config (exclude transient timer state)
+        let excludeKeys: Set<String> = ["timer_phase", "timer_target_time", "timer_paused_remaining", "overtime_active"]
+        var config: [String: String] = [:]
+        stmt = nil
+        if sqlite3_prepare_v2(db, "SELECT key, value FROM config", -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let key = String(cString: sqlite3_column_text(stmt, 0))
+                let value = String(cString: sqlite3_column_text(stmt, 1))
+                if !excludeKeys.contains(key) {
+                    config[key] = value
+                }
+            }
+        }
+        sqlite3_finalize(stmt)
+        result["config"] = config
+
+        return result
     }
 
     // MARK: - Helpers

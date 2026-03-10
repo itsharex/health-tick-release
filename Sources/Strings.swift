@@ -121,6 +121,15 @@ struct L {
     static var durationChangedMsg: String { isZh ? "工作或休息时长已修改，是否按新设置重新开始计时？" : "Work or break duration has been changed. Restart the timer with new settings?" }
     static var restartTimer: String { isZh ? "重新计时" : "Restart Timer" }
     static var laterAction: String { isZh ? "稍后再说" : "Later" }
+    static var exportData: String { isZh ? "导出数据" : "Export Data" }
+    static var exportAction: String { isZh ? "导出" : "Export" }
+    static var exportDataDesc: String { isZh ? "导出所有打卡记录和设置（加密）" : "Export all records and settings (encrypted)" }
+    static var exportPasswordTitle: String { isZh ? "设置导出密码" : "Set Export Password" }
+    static var exportPasswordMsg: String { isZh ? "数据将使用此密码加密，导入时需要输入相同密码。" : "Data will be encrypted with this password. You'll need it to import." }
+    static var exportPasswordPlaceholder: String { isZh ? "输入密码" : "Enter password" }
+    static var exportSuccess: String { isZh ? "数据导出成功" : "Data exported successfully" }
+    static var exportFailed: String { isZh ? "导出失败" : "Export failed" }
+    static var passwordEmpty: String { isZh ? "密码不能为空" : "Password cannot be empty" }
 
     // MARK: - Settings - Reminders
     static var reminderHint: String { isZh ? "休息时随机展示一条提醒" : "A random reminder is shown during breaks" }
