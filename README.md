@@ -26,6 +26,10 @@
   <a href="https://github.com/lifedever/health-tick-release/releases/latest">
     ⬇️ <strong>点击下载最新版本</strong>
   </a>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <a href="https://lifedever.github.io/sponsor/">
+    💖 <strong>捐赠支持</strong>
+  </a>
 </p>
 
 ---
@@ -86,6 +90,10 @@ swift build -c release
 
 - macOS 14 (Sonoma) 或更高版本
 - Apple Silicon / Intel 均支持
+
+## 💖 捐赠支持
+
+如果 HealthTick 对你有帮助，欢迎[捐赠支持](https://lifedever.github.io/sponsor/)开发者持续维护。
 
 ## 📄 许可证
 
