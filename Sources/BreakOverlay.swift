@@ -222,6 +222,7 @@ final class BreakOverlayManager {
     private var menuPinTimer: Timer?
     private weak var menuBarExtraPanel: NSPanel?
     private var isMenuWindowMode = false
+    private var monitorStartTime: Date?
     private var originalPanelLevel: NSWindow.Level?
     private var originalHidesOnDeactivate: Bool?
 
@@ -470,6 +471,7 @@ final class BreakOverlayManager {
     // MARK: - Monitoring
 
     private func startMonitoring() {
+        monitorStartTime = Date()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor [weak self] in self?.monitorTick() }
@@ -478,7 +480,8 @@ final class BreakOverlayManager {
 
     private func monitorTick() {
         let idle = getUserIdleSeconds()
-        if idle < 3 && remaining > 0 {
+        let gracePeriod = monitorStartTime.map { Date().timeIntervalSince($0) < 4 } ?? false
+        if idle < 3 && remaining > 0 && !gracePeriod {
             appState?.breakWarning = L.breakDetectedPause
             appState?.playBreakDetectSound()
         } else {
