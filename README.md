@@ -16,8 +16,10 @@
   <a href="https://github.com/lifedever/health-tick-release/releases">
     <img src="https://img.shields.io/github/downloads/lifedever/health-tick-release/total?style=flat-square&color=7C3AED&label=%E4%B8%8B%E8%BD%BD%E6%AC%A1%E6%95%B0" alt="Downloads">
   </a>
-  <img src="https://img.shields.io/badge/平台-macOS%2014%2B-blue?style=flat-square" alt="Platform">
-  <img src="https://img.shields.io/badge/价格-免费-green?style=flat-square" alt="Free">
+  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?style=flat-square" alt="Platform">
+  <a href="https://creativecommons.org/licenses/by-nc/4.0/">
+    <img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-orange?style=flat-square" alt="License">
+  </a>
 </p>
 
 <p align="center">
@@ -37,10 +39,17 @@
 | 🔍 **操作检测** | 休息期间检测到键鼠操作自动暂停倒计时，确保真正休息 |
 | 🎯 **每日目标** | 设定每天休息次数目标，追踪完成进度 |
 | 🔥 **连续打卡** | 记录连续达标天数，激励持续坚持 |
-| 🏆 **徽章系统** | 11 枚隐藏徽章等你解锁，从「迈出第一步」到「年度传说」 |
+| 🏆 **徽章系统** | 18 枚徽章等你解锁，连续打卡 + 累计打卡双线激励 |
 | 📊 **数据统计** | 7 天柱状图、30 天热力图、周/月达标率一目了然 |
 | 📌 **菜单栏常驻** | 轻量运行，不打扰工作 |
-| 🔄 **自动更新** | 启动时自动检查新版本，也可手动检查 |
+| 🔄 **自动更新** | 启动时自动检查新版本 |
+
+## 📸 截图
+
+<table><tr>
+<td><img src="screenshot.png" width="400" alt="HealthTick 菜单栏"></td>
+<td><img src="screenshot-settings.png" width="400" alt="HealthTick 设置"></td>
+</tr></table>
 
 ## 📥 安装
 
@@ -59,32 +68,36 @@ brew upgrade --cask health-tick
 
 ### 方式二：手动下载
 
-前往 [Releases](https://github.com/lifedever/health-tick-release/releases/latest) 页面下载最新版本：
-
-1. 下载 **`.dmg`** 文件，打开后将 HealthTick 拖入 Applications 文件夹
-2. 或下载 **`.zip`** 文件，解压后移动到"应用程序"文件夹
+前往 [Releases](https://github.com/lifedever/health-tick-release/releases/latest) 页面下载 `.dmg` 文件，打开后将 HealthTick 拖入 Applications 文件夹。
 
 > 💡 首次打开可能提示"无法验证开发者"，请前往 **系统设置 → 隐私与安全性** 点击"仍要打开"。
 
-## 🔄 更新
+## 🛠️ 从源码构建
 
-- 应用启动时会自动检查新版本并提示下载
-- 也可在 **设置 → 关于** 中手动检查更新
+需要 macOS 14+、Swift 5.9+。
+
+```bash
+git clone https://github.com/lifedever/health-tick-release.git
+cd health-tick-release
+swift build -c release
+```
 
 ## 💻 系统要求
 
 - macOS 14 (Sonoma) 或更高版本
 - Apple Silicon / Intel 均支持
 
-## 📸 截图
+## 📄 许可证
 
-<table><tr><td><img src="screenshot.png" width="400" alt="HealthTick 菜单栏"></td><td><img src="screenshot-settings.png" width="400" alt="HealthTick 设置"></td></tr></table>
+本项目采用 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) 许可证。
 
----
+你可以自由查看、学习、修改和非商业性分发本项目代码，但**不得用于商业用途**。
 
 ## 💬 反馈
 
 遇到问题或有建议？欢迎在 [Issues](https://github.com/lifedever/health-tick-release/issues) 中反馈。
+
+---
 
 <p align="center">
   Made with ❤️ for your health
