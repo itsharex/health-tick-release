@@ -107,8 +107,8 @@ final class UpdateChecker: ObservableObject {
     }
 
     func showUpdateAlertPublic() {
-        guard let version = latestVersion else { return }
-        showUpdateAlert(version: version)
+        // Re-check to ensure we have the latest version before showing alert
+        check(silent: false)
     }
 
     private func showUpdateAlert(version: String) {

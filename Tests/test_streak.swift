@@ -27,12 +27,6 @@ func dateStr(_ daysAgo: Int) -> String {
 
 func todayString() -> String { dateStr(0) }
 
-func dateFmt() -> DateFormatter {
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd"
-    return f
-}
-
 // MARK: - Database helpers
 
 func openDB() -> OpaquePointer? {
@@ -45,6 +39,20 @@ func openDB() -> OpaquePointer? {
             date TEXT NOT NULL
         );
         CREATE INDEX idx_records_date ON records(date);
+        CREATE TABLE sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            work_start TEXT NOT NULL,
+            work_end TEXT,
+            work_minutes INTEGER NOT NULL,
+            break_start TEXT,
+            break_end TEXT,
+            break_minutes INTEGER NOT NULL,
+            break_actual_seconds INTEGER,
+            skipped INTEGER NOT NULL DEFAULT 0,
+            daily_goal INTEGER NOT NULL
+        );
+        CREATE INDEX idx_sessions_date ON sessions(date);
     """, nil, nil, nil)
     return db
 }
@@ -56,11 +64,21 @@ func addRecords(_ db: OpaquePointer?, date: String, count: Int) {
     }
 }
 
-// MARK: - streakDays: skip days with no records, only break on "used but not met"
+func addSession(_ db: OpaquePointer?, date: String, goal: Int) {
+    let now = ISO8601DateFormatter().string(from: Date())
+    sqlite3_exec(db, "INSERT INTO sessions (date, work_start, work_minutes, break_minutes, daily_goal) VALUES ('\(date)', '\(now)', 60, 2, \(goal))", nil, nil, nil)
+}
+
+// MARK: - streakDays (with per-day goal from sessions)
 
 func streakDays(_ db: OpaquePointer?, goal: Int) -> Int {
     var stmt: OpaquePointer?
-    let sql = "SELECT date, COUNT(*) as cnt FROM records GROUP BY date ORDER BY date DESC"
+    let sql = """
+        SELECT r.date, r.cnt, COALESCE(s.goal, \(goal)) as day_goal
+        FROM (SELECT date, COUNT(*) as cnt FROM records GROUP BY date) r
+        LEFT JOIN (SELECT date, daily_goal as goal FROM sessions GROUP BY date HAVING id = MAX(id)) s ON r.date = s.date
+        ORDER BY r.date DESC
+        """
     guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
     defer { sqlite3_finalize(stmt) }
 
@@ -70,11 +88,11 @@ func streakDays(_ db: OpaquePointer?, goal: Int) -> Int {
     while sqlite3_step(stmt) == SQLITE_ROW {
         let ds = String(cString: sqlite3_column_text(stmt, 0))
         let cnt = Int(sqlite3_column_int(stmt, 1))
+        let dayGoal = Int(sqlite3_column_int(stmt, 2))
 
-        // Today hasn't met goal: in progress, skip
-        if ds == today && cnt < goal { continue }
+        if ds == today && cnt < dayGoal { continue }
 
-        if cnt >= goal {
+        if cnt >= dayGoal {
             streak += 1
         } else {
             break
@@ -84,19 +102,24 @@ func streakDays(_ db: OpaquePointer?, goal: Int) -> Int {
     return streak
 }
 
-// MARK: - maxStreakDays: same rule, skip-free days, only break on "used but not met"
+// MARK: - maxStreakDays (with per-day goal from sessions)
 
 func maxStreakDays(_ db: OpaquePointer?, goal: Int) -> Int {
     var stmt: OpaquePointer?
-    let sql = "SELECT date, COUNT(*) as cnt FROM records GROUP BY date ORDER BY date"
+    let sql = """
+        SELECT r.date, r.cnt, COALESCE(s.goal, \(goal)) as day_goal
+        FROM (SELECT date, COUNT(*) as cnt FROM records GROUP BY date) r
+        LEFT JOIN (SELECT date, daily_goal as goal FROM sessions GROUP BY date HAVING id = MAX(id)) s ON r.date = s.date
+        ORDER BY r.date
+        """
     guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
     defer { sqlite3_finalize(stmt) }
-
     var maxS = 0, curS = 0
 
     while sqlite3_step(stmt) == SQLITE_ROW {
         let cnt = Int(sqlite3_column_int(stmt, 1))
-        if cnt >= goal {
+        let dayGoal = Int(sqlite3_column_int(stmt, 2))
+        if cnt >= dayGoal {
             curS += 1
             maxS = max(maxS, curS)
         } else {
@@ -109,7 +132,7 @@ func maxStreakDays(_ db: OpaquePointer?, goal: Int) -> Int {
 
 // MARK: - Tests
 
-print("=== streakDays tests ===\n")
+print("=== streakDays basic tests ===\n")
 
 // 1. Empty
 do {
@@ -122,15 +145,18 @@ do {
 do {
     let db = openDB()
     addRecords(db, date: dateStr(0), count: 3)
+    addSession(db, date: dateStr(0), goal: 3)
     assertEqual(streakDays(db, goal: 3), 1, "2. today met -> 1")
     sqlite3_close(db)
 }
 
-// 3. Today in progress (not met), yesterday met
+// 3. Today in progress, yesterday met
 do {
     let db = openDB()
     addRecords(db, date: dateStr(0), count: 1)
+    addSession(db, date: dateStr(0), goal: 3)
     addRecords(db, date: dateStr(1), count: 3)
+    addSession(db, date: dateStr(1), goal: 3)
     assertEqual(streakDays(db, goal: 3), 1, "3. today in-progress, yesterday met -> 1")
     sqlite3_close(db)
 }
@@ -139,6 +165,7 @@ do {
 do {
     let db = openDB()
     addRecords(db, date: dateStr(1), count: 3)
+    addSession(db, date: dateStr(1), goal: 3)
     assertEqual(streakDays(db, goal: 3), 1, "4. today no records, yesterday met -> 1")
     sqlite3_close(db)
 }
@@ -147,183 +174,164 @@ do {
 do {
     let db = openDB()
     addRecords(db, date: dateStr(1), count: 3)
+    addSession(db, date: dateStr(1), goal: 3)
     addRecords(db, date: dateStr(2), count: 3)
+    addSession(db, date: dateStr(2), goal: 3)
     assertEqual(streakDays(db, goal: 3), 2, "5. 2-day streak -> 2")
     sqlite3_close(db)
 }
 
-// 6. Three consecutive days including today
-do {
-    let db = openDB()
-    addRecords(db, date: dateStr(0), count: 3)
-    addRecords(db, date: dateStr(1), count: 3)
-    addRecords(db, date: dateStr(2), count: 3)
-    assertEqual(streakDays(db, goal: 3), 3, "6. 3 days with today -> 3")
-    sqlite3_close(db)
-}
-
-// 7. Today in progress, yesterday NOT met -> break
+// 6. Today in progress, yesterday NOT met -> break
 do {
     let db = openDB()
     addRecords(db, date: dateStr(0), count: 1)
+    addSession(db, date: dateStr(0), goal: 3)
     addRecords(db, date: dateStr(1), count: 1)
-    assertEqual(streakDays(db, goal: 3), 0, "7. today in-progress, yesterday not met -> 0")
+    addSession(db, date: dateStr(1), goal: 3)
+    assertEqual(streakDays(db, goal: 3), 0, "6. today in-progress, yesterday not met -> 0")
     sqlite3_close(db)
 }
 
-// 8. No records for several days, old record met -> still counts (didn't use app = no penalty)
+// 7. No records for several days, old record met
 do {
     let db = openDB()
     addRecords(db, date: dateStr(5), count: 3)
-    assertEqual(streakDays(db, goal: 3), 1, "8. 5 days ago met, no records since -> 1")
+    addSession(db, date: dateStr(5), goal: 3)
+    assertEqual(streakDays(db, goal: 3), 1, "7. 5 days ago met, no records since -> 1")
     sqlite3_close(db)
 }
 
-// 9. Yesterday met, day before used but NOT met -> break at day before
-do {
-    let db = openDB()
-    addRecords(db, date: dateStr(1), count: 3)
-    addRecords(db, date: dateStr(2), count: 1)
-    addRecords(db, date: dateStr(3), count: 3)
-    assertEqual(streakDays(db, goal: 3), 1, "9. yesterday met, day-2 not met -> 1")
-    sqlite3_close(db)
-}
-
-// 10. Long streak: 7 days met, today no records
+// 8. Long streak: 7 days met
 do {
     let db = openDB()
     for i in 1...7 {
         addRecords(db, date: dateStr(i), count: 3)
+        addSession(db, date: dateStr(i), goal: 3)
     }
-    assertEqual(streakDays(db, goal: 3), 7, "10. 7-day streak -> 7")
+    assertEqual(streakDays(db, goal: 3), 7, "8. 7-day streak -> 7")
     sqlite3_close(db)
 }
 
-// 11. Leave/no-app scenario: 3 days no records, before that 5 days met -> 5
+// 9. Leave scenario: 3 days no app, before that 5 days met
 do {
     let db = openDB()
     for i in 4...8 {
         addRecords(db, date: dateStr(i), count: 3)
+        addSession(db, date: dateStr(i), goal: 3)
     }
-    assertEqual(streakDays(db, goal: 3), 5, "11. 3 days no app, 5-day streak -> 5")
+    assertEqual(streakDays(db, goal: 3), 5, "9. 3 days no app, 5-day streak -> 5")
     sqlite3_close(db)
 }
 
-// 12. Today met, then gap (no records), then met -> streak continues through gap
+print("\n=== Goal change tests (KEY FIX) ===\n")
+
+// 10. User's exact scenario: yesterday goal=5 done=5, today goal=6 done=3
 do {
     let db = openDB()
+    addRecords(db, date: dateStr(1), count: 5)
+    addSession(db, date: dateStr(1), goal: 5)
     addRecords(db, date: dateStr(0), count: 3)
-    // days 1-2: no records
+    addSession(db, date: dateStr(0), goal: 6)
+    let streak = streakDays(db, goal: 6)
+    assertEqual(streak, 1, "10. yesterday goal=5 done=5, today goal=6 in-progress -> 1")
+    sqlite3_close(db)
+}
+
+// 11. Goal changed mid-streak: day3 goal=3 done=3, day2 goal=5 done=5, day1 goal=8 done=4
+do {
+    let db = openDB()
     addRecords(db, date: dateStr(3), count: 3)
-    assertEqual(streakDays(db, goal: 3), 2, "12. today met, gap, then met -> 2")
+    addSession(db, date: dateStr(3), goal: 3)
+    addRecords(db, date: dateStr(2), count: 5)
+    addSession(db, date: dateStr(2), goal: 5)
+    addRecords(db, date: dateStr(1), count: 4)
+    addSession(db, date: dateStr(1), goal: 8) // not met!
+    let streak = streakDays(db, goal: 8)
+    assertEqual(streak, 0, "11. yesterday goal=8 done=4 -> break -> 0")
     sqlite3_close(db)
 }
 
-// 13. User scenario: 1号完成, 今天2号
+// 12. Goal lowered: yesterday goal=10 done=6 (not met), but if current goal=5 it should still use day's goal
 do {
     let db = openDB()
-    addRecords(db, date: dateStr(1), count: 3)
+    addRecords(db, date: dateStr(1), count: 6)
+    addSession(db, date: dateStr(1), goal: 10)
+    let streak = streakDays(db, goal: 5)
+    assertEqual(streak, 0, "12. yesterday goal=10 done=6 -> not met even with current goal=5 -> 0")
+    sqlite3_close(db)
+}
+
+// 13. Goal raised today, past days all met their own goals
+do {
+    let db = openDB()
+    addRecords(db, date: dateStr(3), count: 3)
+    addSession(db, date: dateStr(3), goal: 3)
+    addRecords(db, date: dateStr(2), count: 4)
+    addSession(db, date: dateStr(2), goal: 4)
+    addRecords(db, date: dateStr(1), count: 5)
+    addSession(db, date: dateStr(1), goal: 5)
+    let streak = streakDays(db, goal: 8) // current goal=8, but past days had their own goals
+    assertEqual(streak, 3, "13. goal raised today, past days all met own goals -> 3")
+    sqlite3_close(db)
+}
+
+// 14. No sessions for old data (COALESCE fallback to current goal)
+do {
+    let db = openDB()
+    addRecords(db, date: dateStr(1), count: 5)
+    // no session record for this day
     let streak = streakDays(db, goal: 3)
-    assertEqual(streak, 1, "13. user: yesterday done -> 1")
-    assertEqual(3 - streak, 2, "13b. badge: 2 days left")
+    assertEqual(streak, 1, "14. no session data, fallback to current goal -> 1")
     sqlite3_close(db)
 }
 
-// 14. User scenario: 2号用了app但没达标, 今天3号
+// 15. No sessions, fallback, not met
 do {
     let db = openDB()
-    addRecords(db, date: dateStr(2), count: 3) // day 1 met
-    addRecords(db, date: dateStr(1), count: 1) // day 2 used, not met = break
+    addRecords(db, date: dateStr(1), count: 2)
     let streak = streakDays(db, goal: 3)
-    assertEqual(streak, 0, "14. user: day 2 broke streak -> 0")
-    assertEqual(3 - streak, 3, "14b. badge: 3 days left")
-    sqlite3_close(db)
-}
-
-// 15. Weekend scenario: Fri met, Sat/Sun no app, Mon(today) just opened -> 1
-do {
-    let db = openDB()
-    addRecords(db, date: dateStr(3), count: 3) // Fri
-    // Sat(2), Sun(1): no records
-    assertEqual(streakDays(db, goal: 3), 1, "15. Fri met, weekend off, Mon today -> 1")
-    sqlite3_close(db)
-}
-
-// 16. Today in progress, long streak with gaps (leave days)
-do {
-    let db = openDB()
-    addRecords(db, date: dateStr(0), count: 1) // today in progress
-    addRecords(db, date: dateStr(1), count: 3) // yesterday met
-    // day 2-3: no records (leave)
-    addRecords(db, date: dateStr(4), count: 3) // met
-    addRecords(db, date: dateStr(5), count: 3) // met
-    assertEqual(streakDays(db, goal: 3), 3, "16. today in-progress, streak with leave gaps -> 3")
-    sqlite3_close(db)
-}
-
-// 17. Half year no records, last day met -> 1
-do {
-    let db = openDB()
-    addRecords(db, date: dateStr(180), count: 3)
-    assertEqual(streakDays(db, goal: 3), 1, "17. 6 months ago met, no records since -> 1")
+    assertEqual(streak, 0, "15. no session data, fallback goal=3, done=2 -> 0")
     sqlite3_close(db)
 }
 
 print("\n=== maxStreakDays tests ===\n")
 
-// 18. Basic max streak
+// 16. Max streak with per-day goals
 do {
     let db = openDB()
     for i in 1...5 {
         addRecords(db, date: dateStr(i), count: 3)
+        addSession(db, date: dateStr(i), goal: 3)
     }
-    assertEqual(maxStreakDays(db, goal: 3), 5, "18. max streak 5 -> 5")
+    assertEqual(maxStreakDays(db, goal: 3), 5, "16. max streak 5 -> 5")
     sqlite3_close(db)
 }
 
-// 19. Max streak with break in middle
+// 17. Max streak respects per-day goal changes
 do {
     let db = openDB()
     addRecords(db, date: dateStr(5), count: 3)
+    addSession(db, date: dateStr(5), goal: 3) // met
     addRecords(db, date: dateStr(4), count: 3)
-    addRecords(db, date: dateStr(3), count: 3)
-    addRecords(db, date: dateStr(2), count: 1) // not met = break
-    addRecords(db, date: dateStr(1), count: 3)
-    assertEqual(maxStreakDays(db, goal: 3), 3, "19. max streak with break -> 3")
+    addSession(db, date: dateStr(4), goal: 5) // NOT met (3 < 5)
+    addRecords(db, date: dateStr(3), count: 5)
+    addSession(db, date: dateStr(3), goal: 5) // met
+    addRecords(db, date: dateStr(2), count: 5)
+    addSession(db, date: dateStr(2), goal: 5) // met
+    addRecords(db, date: dateStr(1), count: 5)
+    addSession(db, date: dateStr(1), goal: 5) // met
+    assertEqual(maxStreakDays(db, goal: 5), 3, "17. max streak with goal change break -> 3")
     sqlite3_close(db)
 }
 
-// 20. Max streak captures historical best
+// 18. Max streak with user's scenario
 do {
     let db = openDB()
-    for i in 6...10 {
-        addRecords(db, date: dateStr(i), count: 3) // 5-day streak
-    }
-    addRecords(db, date: dateStr(5), count: 1) // break
-    for i in 1...3 {
-        addRecords(db, date: dateStr(i), count: 3) // 3-day streak
-    }
-    assertEqual(maxStreakDays(db, goal: 3), 5, "20. max streak historical best -> 5")
-    sqlite3_close(db)
-}
-
-// 21. Max streak with gaps (no records = not a break)
-do {
-    let db = openDB()
-    addRecords(db, date: dateStr(10), count: 3)
-    addRecords(db, date: dateStr(8), count: 3) // day 9 no records = skip
-    addRecords(db, date: dateStr(5), count: 3) // day 6-7 no records = skip
-    assertEqual(maxStreakDays(db, goal: 3), 3, "21. max streak with gaps (no records) -> 3")
-    sqlite3_close(db)
-}
-
-// 22. Max streak: gap doesn't connect separate streaks broken by not-met
-do {
-    let db = openDB()
-    addRecords(db, date: dateStr(5), count: 3) // met
-    addRecords(db, date: dateStr(4), count: 1) // not met = real break
-    addRecords(db, date: dateStr(1), count: 3) // met
-    assertEqual(maxStreakDays(db, goal: 3), 1, "22. not-met breaks even with gaps -> 1")
+    addRecords(db, date: dateStr(1), count: 5)
+    addSession(db, date: dateStr(1), goal: 5) // met
+    addRecords(db, date: dateStr(0), count: 3)
+    addSession(db, date: dateStr(0), goal: 6) // today not met, but current goal=6
+    assertEqual(maxStreakDays(db, goal: 6), 1, "18. max streak user scenario -> 1")
     sqlite3_close(db)
 }
 

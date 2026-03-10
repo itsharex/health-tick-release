@@ -185,7 +185,12 @@ final class Database {
 
     func streakDays(goal: Int) -> Int {
         var stmt: OpaquePointer?
-        let sql = "SELECT date, COUNT(*) as cnt FROM records GROUP BY date ORDER BY date DESC"
+        let sql = """
+            SELECT r.date, r.cnt, COALESCE(s.goal, \(goal)) as day_goal
+            FROM (SELECT date, COUNT(*) as cnt FROM records GROUP BY date) r
+            LEFT JOIN (SELECT date, daily_goal as goal FROM sessions GROUP BY date HAVING id = MAX(id)) s ON r.date = s.date
+            ORDER BY r.date DESC
+            """
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
         defer { sqlite3_finalize(stmt) }
 
@@ -195,11 +200,12 @@ final class Database {
         while sqlite3_step(stmt) == SQLITE_ROW {
             let dateStr = String(cString: sqlite3_column_text(stmt, 0))
             let cnt = Int(sqlite3_column_int(stmt, 1))
+            let dayGoal = Int(sqlite3_column_int(stmt, 2))
 
             // Today hasn't met goal yet — skip (still in progress)
-            if dateStr == today && cnt < goal { continue }
+            if dateStr == today && cnt < dayGoal { continue }
 
-            if cnt >= goal {
+            if cnt >= dayGoal {
                 streak += 1
             } else {
                 break // used app but didn't meet goal = streak broken
@@ -211,14 +217,20 @@ final class Database {
 
     func maxStreakDays(goal: Int) -> Int {
         var stmt: OpaquePointer?
-        let sql = "SELECT date, COUNT(*) as cnt FROM records GROUP BY date ORDER BY date"
+        let sql = """
+            SELECT r.date, r.cnt, COALESCE(s.goal, \(goal)) as day_goal
+            FROM (SELECT date, COUNT(*) as cnt FROM records GROUP BY date) r
+            LEFT JOIN (SELECT date, daily_goal as goal FROM sessions GROUP BY date HAVING id = MAX(id)) s ON r.date = s.date
+            ORDER BY r.date
+            """
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
         defer { sqlite3_finalize(stmt) }
         var maxS = 0, curS = 0
 
         while sqlite3_step(stmt) == SQLITE_ROW {
             let cnt = Int(sqlite3_column_int(stmt, 1))
-            if cnt >= goal {
+            let dayGoal = Int(sqlite3_column_int(stmt, 2))
+            if cnt >= dayGoal {
                 curS += 1
                 maxS = max(maxS, curS)
             } else {

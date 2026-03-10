@@ -641,7 +641,7 @@ struct ReminderTab: View {
 
 struct AboutTab: View {
     @EnvironmentObject var state: AppState
-    @StateObject private var updater = UpdateChecker.shared
+    @ObservedObject private var updater = UpdateChecker.shared
 
     var body: some View {
         VStack(spacing: 14) {
@@ -685,6 +685,25 @@ struct AboutTab: View {
             .controlSize(.regular)
             .disabled(updater.isChecking)
             .handCursor()
+
+            if updater.hasUpdate, let ver = updater.latestVersion {
+                Button {
+                    updater.showUpdateAlertPublic()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .foregroundStyle(.blue)
+                        Text(L.updateAvailable(ver))
+                            .font(.callout)
+                            .foregroundStyle(.blue)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.borderless)
+                .handCursor()
+            }
 
             if let err = updater.checkError {
                 Text(err)
