@@ -113,26 +113,6 @@ struct HelpView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
-                Divider()
-
-                sectionTitle(L.helpSponsorSection, icon: "heart.fill", color: .red)
-
-                Text(L.helpSponsorDesc)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 24) {
-                    Spacer()
-                    sponsorImage("wechat-pay", label: L.wechatPay)
-                    sponsorImage("alipay", label: L.alipay)
-                    Spacer()
-                }
-
-                Text("\(L.helpSponsorThanks) ❤️")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-
                 Spacer(minLength: 20)
             }
             .padding(32)
