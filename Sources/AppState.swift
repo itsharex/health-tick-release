@@ -205,6 +205,8 @@ final class AppState: ObservableObject {
     var lastSkipClickTime: Date?
     @Published var weekData: [(String, Int)] = []
     @Published var totalCount: Int = 0
+    @Published var todayWorkMinutes: Int = 0
+    @Published var weekWorkData: [(String, Int)] = []
     @Published var isInQuietHours: Bool = false
     @Published var goalReachedPaused: Bool = false
     @Published var overtimeActive: Bool = false
@@ -222,6 +224,7 @@ final class AppState: ObservableObject {
     private var alertRepeatTimer: Timer?
     private var quietCheckTimer: Timer?
     private var autoQuietPaused: Bool = false
+    private var lastWorkMinutesRefresh: Date = .distantPast
     private let db = Database.shared
     var overlayManager = BreakOverlayManager()
 
@@ -335,6 +338,11 @@ final class AppState: ObservableObject {
         let newVal = max(0, Int(targetTime.timeIntervalSinceNow))
         if newVal != remainingSeconds {
             remainingSeconds = newVal
+        }
+        // Refresh work minutes every 60 seconds
+        if Date().timeIntervalSince(lastWorkMinutesRefresh) >= 60 {
+            todayWorkMinutes = db.todayWorkMinutes()
+            lastWorkMinutesRefresh = Date()
         }
         if remainingSeconds <= 0 {
             onWorkDone()
@@ -488,6 +496,8 @@ final class AppState: ObservableObject {
         maxStreak = db.maxStreakDays(goal: config.dailyGoal)
         weekData = db.recent7DaysCounts()
         totalCount = db.totalCount()
+        todayWorkMinutes = db.todayWorkMinutes()
+        weekWorkData = db.recent7DaysWorkMinutes()
     }
 
     private func detectNewBadge(oldStreak: Int, oldTotal: Int) -> Badge? {

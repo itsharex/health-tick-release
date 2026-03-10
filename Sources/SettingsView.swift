@@ -232,6 +232,7 @@ struct SystemTab: View {
 struct AppTab: View {
     @EnvironmentObject var state: AppState
     @State private var showQuietHelp = false
+    @State private var showWorkHoursHelp = false
     @State private var showShortcutHelp = false
 
     var body: some View {
@@ -298,156 +299,182 @@ struct AppTab: View {
                 .padding(.vertical, 4)
                 .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
 
-                // Work Days
-                VStack(spacing: 8) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "calendar")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20)
-                        Text(L.workDays)
-                            .font(.callout)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-
-                    HStack(spacing: 6) {
-                        ForEach([2, 3, 4, 5, 6, 7, 1], id: \.self) { day in
-                            Button {
-                                if state.config.workDays.contains(day) {
-                                    state.config.workDays.remove(day)
-                                } else {
-                                    state.config.workDays.insert(day)
-                                }
-                            } label: {
-                                Text(L.weekdayName(day))
-                                    .font(.system(size: 12, weight: .medium))
-                                    .frame(width: 36, height: 28)
-                                    .foregroundStyle(state.config.workDays.contains(day) ? .white : .primary)
-                                    .background(
-                                        state.config.workDays.contains(day) ? Color.green : Color.gray.opacity(0.15),
-                                        in: RoundedRectangle(cornerRadius: 6)
-                                    )
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                }
-                .padding(.vertical, 10)
-                .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
-
-                // Work Hours
-                VStack(spacing: 8) {
-                    toggleRow(icon: "clock.fill", label: L.workHoursLabel, isOn: $state.config.workHoursEnabled)
-
-                    if state.config.workHoursEnabled {
-                        HStack(spacing: 8) {
-                            Spacer().frame(width: 30)
-                            Text(L.workStartTime)
+                // Work Days + Work Hours + Quiet Hours
+                VStack(spacing: 0) {
+                    // Work Days
+                    VStack(spacing: 8) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "calendar")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
-                            DatePicker("", selection: Binding(
-                                get: { dateFromHHmm(state.config.workStartTime) },
-                                set: { state.config.workStartTime = hhmmFromDate($0) }
-                            ), displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .frame(width: 80)
-
-                            Text("—")
-                                .foregroundStyle(.secondary)
-
-                            Text(L.workEndTime)
+                                .frame(width: 20)
+                            Text(L.workDays)
                                 .font(.callout)
-                                .foregroundStyle(.secondary)
-                            DatePicker("", selection: Binding(
-                                get: { dateFromHHmm(state.config.workEndTime) },
-                                set: { state.config.workEndTime = hhmmFromDate($0) }
-                            ), displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .frame(width: 80)
-
                             Spacer()
                         }
                         .padding(.horizontal, 14)
-                    }
-                }
-                .padding(.vertical, 10)
-                .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
 
-                // Quiet Hours
-                VStack(spacing: 8) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "moon.fill")
-                            .font(.callout)
-                            .foregroundStyle(.purple)
-                            .frame(width: 20)
-                        Text(L.quietHours)
-                            .font(.callout)
-                        Button {
-                            showQuietHelp.toggle()
-                        } label: {
-                            Image(systemName: "questionmark.circle")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.tertiary)
+                        HStack(spacing: 6) {
+                            ForEach([2, 3, 4, 5, 6, 7, 1], id: \.self) { day in
+                                Button {
+                                    if state.config.workDays.contains(day) {
+                                        state.config.workDays.remove(day)
+                                    } else {
+                                        state.config.workDays.insert(day)
+                                    }
+                                } label: {
+                                    Text(L.weekdayName(day))
+                                        .font(.system(size: 12, weight: .medium))
+                                        .frame(width: 36, height: 28)
+                                        .foregroundStyle(state.config.workDays.contains(day) ? .white : .primary)
+                                        .background(
+                                            state.config.workDays.contains(day) ? Color.green : Color.gray.opacity(0.15),
+                                            in: RoundedRectangle(cornerRadius: 6)
+                                        )
+                                }
+                                .buttonStyle(.borderless)
+                            }
                         }
-                        .buttonStyle(.borderless)
-                        .popover(isPresented: $showQuietHelp) {
-                            Text(L.quietHoursHelp)
+                        .padding(.horizontal, 14)
+                    }
+                    .padding(.vertical, 10)
+
+                    Divider().padding(.leading, 44)
+
+                    // Work Hours
+                    VStack(spacing: 8) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "clock.fill")
                                 .font(.callout)
-                                .padding(12)
-                                .frame(width: 260)
-                        }
-                        Spacer()
-                        Button {
-                            state.config.quietHours.append(QuietHourPeriod(start: "12:00", end: "13:00"))
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.green)
-                        }
-                        .buttonStyle(.borderless)
-                        .handCursor()
-                    }
-                    .padding(.horizontal, 14)
-
-                    ForEach(Array(state.config.quietHours.enumerated()), id: \.offset) { i, period in
-                        HStack(spacing: 8) {
-                            DatePicker("", selection: Binding(
-                                get: { dateFromHHmm(period.start) },
-                                set: { state.config.quietHours[i].start = hhmmFromDate($0) }
-                            ), displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .frame(width: 80)
-
-                            Text("—")
                                 .foregroundStyle(.secondary)
-
-                            DatePicker("", selection: Binding(
-                                get: { dateFromHHmm(period.end) },
-                                set: { state.config.quietHours[i].end = hhmmFromDate($0) }
-                            ), displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .frame(width: 80)
-
-                            Spacer()
-
+                                .frame(width: 20)
+                            Text(L.workHoursLabel)
+                                .font(.callout)
                             Button {
-                                state.config.quietHours.remove(at: i)
+                                showWorkHoursHelp.toggle()
                             } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 9, weight: .bold))
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 12))
                                     .foregroundStyle(.tertiary)
-                                    .frame(width: 18, height: 18)
-                                    .background(.quaternary, in: Circle())
+                            }
+                            .buttonStyle(.borderless)
+                            .popover(isPresented: $showWorkHoursHelp) {
+                                Text(L.workHoursHelp)
+                                    .font(.callout)
+                                    .padding(12)
+                                    .frame(width: 260)
+                            }
+                            Spacer()
+                            Toggle("", isOn: $state.config.workHoursEnabled)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                                .tint(.green)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+
+                        if state.config.workHoursEnabled {
+                            HStack(spacing: 8) {
+                                DatePicker("", selection: Binding(
+                                    get: { dateFromHHmm(state.config.workStartTime) },
+                                    set: { state.config.workStartTime = hhmmFromDate($0) }
+                                ), displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                                .frame(width: 80)
+
+                                Text("—")
+                                    .foregroundStyle(.secondary)
+
+                                DatePicker("", selection: Binding(
+                                    get: { dateFromHHmm(state.config.workEndTime) },
+                                    set: { state.config.workEndTime = hhmmFromDate($0) }
+                                ), displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                                .frame(width: 80)
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 14)
+                        }
+                    }
+                    .padding(.vertical, 4)
+
+                    Divider().padding(.leading, 44)
+
+                    // Quiet Hours
+                    VStack(spacing: 8) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "moon.fill")
+                                .font(.callout)
+                                .foregroundStyle(.purple)
+                                .frame(width: 20)
+                            Text(L.quietHours)
+                                .font(.callout)
+                            Button {
+                                showQuietHelp.toggle()
+                            } label: {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .buttonStyle(.borderless)
+                            .popover(isPresented: $showQuietHelp) {
+                                Text(L.quietHoursHelp)
+                                    .font(.callout)
+                                    .padding(12)
+                                    .frame(width: 260)
+                            }
+                            Spacer()
+                            Button {
+                                state.config.quietHours.append(QuietHourPeriod(start: "12:00", end: "13:00"))
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(.green)
                             }
                             .buttonStyle(.borderless)
                             .handCursor()
                         }
                         .padding(.horizontal, 14)
+
+                        ForEach(Array(state.config.quietHours.enumerated()), id: \.offset) { i, period in
+                            HStack(spacing: 8) {
+                                DatePicker("", selection: Binding(
+                                    get: { dateFromHHmm(period.start) },
+                                    set: { state.config.quietHours[i].start = hhmmFromDate($0) }
+                                ), displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                                .frame(width: 80)
+
+                                Text("—")
+                                    .foregroundStyle(.secondary)
+
+                                DatePicker("", selection: Binding(
+                                    get: { dateFromHHmm(period.end) },
+                                    set: { state.config.quietHours[i].end = hhmmFromDate($0) }
+                                ), displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                                .frame(width: 80)
+
+                                Spacer()
+
+                                Button {
+                                    state.config.quietHours.remove(at: i)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 18, height: 18)
+                                        .background(.quaternary, in: Circle())
+                                }
+                                .buttonStyle(.borderless)
+                                .handCursor()
+                            }
+                            .padding(.horizontal, 14)
+                        }
                     }
+                    .padding(.vertical, 10)
                 }
-                .padding(.vertical, 10)
                 .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
 
             }

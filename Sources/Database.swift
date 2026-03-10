@@ -378,6 +378,84 @@ final class Database {
         exec("UPDATE sessions SET break_end = '\(now)', break_actual_seconds = \(actualStr), skipped = \(skipped ? 1 : 0) WHERE id = \(sessionId)")
     }
 
+    // MARK: - Work Minutes
+
+    func todayWorkMinutes() -> Int {
+        workMinutesForDate(Self.todayString())
+    }
+
+    private func workMinutesForDate(_ date: String) -> Int {
+        var stmt: OpaquePointer?
+        let sql = "SELECT work_start, work_end, work_minutes FROM sessions WHERE date = '\(date)'"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        let iso = ISO8601DateFormatter()
+        var total = 0
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let startStr = String(cString: sqlite3_column_text(stmt, 0))
+            guard let start = iso.date(from: startStr) else { continue }
+            let configuredMinutes = Int(sqlite3_column_int(stmt, 2))
+            let elapsed: Int
+            if sqlite3_column_type(stmt, 1) != SQLITE_NULL {
+                let endStr = String(cString: sqlite3_column_text(stmt, 1))
+                let end = iso.date(from: endStr) ?? start
+                elapsed = max(0, Int(end.timeIntervalSince(start) / 60))
+            } else {
+                // work_end is NULL: in-progress or abandoned session
+                // Cap at configured work_minutes to avoid inflated values
+                let raw = max(0, Int(Date().timeIntervalSince(start) / 60))
+                elapsed = min(raw, configuredMinutes)
+            }
+            total += elapsed
+        }
+        return total
+    }
+
+    func recent7DaysWorkMinutes() -> [(String, Int)] {
+        rangeWorkMinutes(days: 7)
+    }
+
+    func last30DaysWorkMinutes() -> [(String, Int)] {
+        rangeWorkMinutes(days: 30)
+    }
+
+    private func rangeWorkMinutes(days: Int) -> [(String, Int)] {
+        let today = Date()
+        let fmt = Self.dateFmt()
+        let iso = ISO8601DateFormatter()
+        let start = fmt.string(from: Calendar.current.date(byAdding: .day, value: -(days - 1), to: today)!)
+
+        var map: [String: Int] = [:]
+        var stmt: OpaquePointer?
+        let sql = "SELECT date, work_start, work_end, work_minutes FROM sessions WHERE date >= '\(start)'"
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let d = String(cString: sqlite3_column_text(stmt, 0))
+                let startStr = String(cString: sqlite3_column_text(stmt, 1))
+                guard let startDate = iso.date(from: startStr) else { continue }
+                let configuredMinutes = Int(sqlite3_column_int(stmt, 3))
+                let elapsed: Int
+                if sqlite3_column_type(stmt, 2) != SQLITE_NULL {
+                    let endStr = String(cString: sqlite3_column_text(stmt, 2))
+                    let endDate = iso.date(from: endStr) ?? startDate
+                    elapsed = max(0, Int(endDate.timeIntervalSince(startDate) / 60))
+                } else {
+                    let raw = max(0, Int(Date().timeIntervalSince(startDate) / 60))
+                    elapsed = min(raw, configuredMinutes)
+                }
+                map[d, default: 0] += elapsed
+            }
+        }
+        sqlite3_finalize(stmt)
+
+        var result: [(String, Int)] = []
+        for i in stride(from: days - 1, through: 0, by: -1) {
+            let d = fmt.string(from: Calendar.current.date(byAdding: .day, value: -i, to: today)!)
+            result.append((d, map[d] ?? 0))
+        }
+        return result
+    }
+
     // MARK: - Total Count
 
     func totalCount() -> Int {

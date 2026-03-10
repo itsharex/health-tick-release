@@ -149,6 +149,18 @@ struct MenuView: View {
                 }
             }
 
+            // Today work time
+            HStack(spacing: 4) {
+                Text("✍️")
+                    .font(.system(size: 12))
+                Text(L.todayWorkedPrefix)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary.opacity(0.6))
+                Text(L.formatWorkTime(state.todayWorkMinutes))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.blue)
+            }
+
             // 7-day pixels
             HStack(spacing: 4) {
                 ForEach(Array(state.weekData.enumerated()), id: \.offset) { _, item in
@@ -168,15 +180,8 @@ struct MenuView: View {
                 }
             }
 
-            // Badge hint
-            if let badge = state.earnedBadge {
-                HStack(spacing: 4) {
-                    Text(badge.icon)
-                    Text(badge.name)
-                        .font(.caption.bold())
-                        .foregroundStyle(.green)
-                }
-            } else if let next = state.nextBadge {
+            // Badge hint — prefer next goal, fallback to earned badge
+            if let next = state.nextBadge {
                 let hint = L.badgeNext(icon: next.icon, name: next.name, days: next.days - state.currentStreak)
                 HStack(spacing: 0) {
                     Text("🎯 \(hint.prefix)")
@@ -194,6 +199,13 @@ struct MenuView: View {
                     Text(hint.suffix)
                         .font(.caption)
                         .foregroundStyle(.primary.opacity(0.5))
+                }
+            } else if let badge = state.earnedBadge {
+                HStack(spacing: 4) {
+                    Text(badge.icon)
+                    Text(badge.name)
+                        .font(.caption.bold())
+                        .foregroundStyle(.green)
                 }
             }
 

@@ -442,6 +442,7 @@ struct L {
 
     // MARK: - Work Hours
     static var workHoursLabel: String { isZh ? "工作时间" : "Work Hours" }
+    static var workHoursHelp: String { isZh ? "开启后，仅在设定的工作时间内运行计时器。下班后自动暂停，可点击「继续工作」进入加班模式。" : "When enabled, the timer only runs during set work hours. It auto-pauses after hours. Tap \"Continue Working\" for overtime." }
     static var workStartTime: String { isZh ? "开始" : "Start" }
     static var workEndTime: String { isZh ? "结束" : "End" }
     static var continueWorking: String { isZh ? "点击继续工作" : "Tap to Continue" }
@@ -450,4 +451,35 @@ struct L {
 
     // MARK: - Break Activities
     static var breakActivity: String { isZh ? "休息建议" : "Break Suggestion" }
+
+    // MARK: - Work Time
+    static var workTimeLabel: String { isZh ? "工时" : "Work" }
+    static var todayWorkTimeLabel: String { isZh ? "今日工时" : "Today Work" }
+    static var todayWorkedPrefix: String { isZh ? "今日已工作" : "Worked today" }
+    static var checkInCountLabel: String { isZh ? "打卡次数" : "Check-ins" }
+    static var workDurationLabel: String { isZh ? "工作时长" : "Work Time" }
+
+    static func formatWorkTime(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return isZh ? "\(minutes)分钟" : "\(minutes)m"
+        }
+        let h = minutes / 60
+        let m = minutes % 60
+        if m > 0 {
+            return isZh ? "\(h)小时\(m)分" : "\(h)h \(m)m"
+        }
+        return isZh ? "\(h)小时" : "\(h)h"
+    }
+
+    static func formatWorkTimeShort(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return isZh ? "\(minutes)分" : "\(minutes)m"
+        }
+        let h = minutes / 60
+        let m = minutes % 60
+        if m > 0 {
+            return isZh ? "\(h)时\(m)分" : "\(h)h\(m)m"
+        }
+        return isZh ? "\(h)时" : "\(h)h"
+    }
 }
