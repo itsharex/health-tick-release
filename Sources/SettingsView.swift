@@ -7,13 +7,15 @@ struct SettingsView: View {
             SystemTab()
                 .tabItem { Label(L.tabSystem, systemImage: "gearshape") }
             AppTab()
-                .tabItem { Label(L.tabApp, systemImage: "slider.horizontal.3") }
+                .tabItem { Label(L.tabApp, systemImage: "calendar.badge.clock") }
+            BreakTab()
+                .tabItem { Label(L.tabBreak, systemImage: "cup.and.saucer.fill") }
             ReminderTab()
                 .tabItem { Label(L.tabReminders, systemImage: "text.bubble") }
             AboutTab()
                 .tabItem { Label(L.tabAbout, systemImage: "info.circle") }
         }
-        .frame(width: 440)
+        .frame(width: 520)
         .fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -75,14 +77,17 @@ private func hhmmFromDate(_ date: Date) -> String {
 // MARK: - System Tab
 
 struct SystemTab: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) var state
     @Environment(\.openWindow) private var openWindow
     @State private var resetSettingsDone = false
     @State private var resetDataDone = false
     @State private var exportDone = false
 
     var body: some View {
-        VStack(spacing: 12) {
+
+        @Bindable var state = state
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 12) {
             VStack(spacing: 0) {
                 pickerRow(icon: "globe", label: L.language) {
                     Picker("", selection: $state.config.language) {
@@ -244,8 +249,9 @@ struct SystemTab: View {
             }
             .padding(.vertical, 4)
             .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .padding(16)
         }
-        .padding(16)
     }
 
     private func confirmReset(title: String, message: String, action: @escaping () -> Void) {
@@ -314,12 +320,12 @@ struct SystemTab: View {
 // MARK: - App Tab
 
 struct AppTab: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) var state
     @State private var showQuietHelp = false
     @State private var showWorkHoursHelp = false
-    @State private var showShortcutHelp = false
 
     var body: some View {
+        @Bindable var state = state
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
                 // Timer sliders
@@ -341,46 +347,6 @@ struct AppTab: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
-                .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
-
-                // Break position + confirm + sounds
-                VStack(spacing: 0) {
-                    pickerRow(icon: "rectangle.inset.filled", label: L.breakWindow) {
-                        Picker("", selection: $state.config.breakPosition) {
-                            ForEach(BreakPosition.allCases, id: \.self) { pos in
-                                Text(pos.label).tag(pos)
-                            }
-                        }
-                        .labelsHidden()
-                        Button {
-                            state.overlayManager.preview(position: state.config.breakPosition)
-                        } label: {
-                            Text(L.preview)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.blue)
-                        }
-                        .buttonStyle(.borderless)
-                    }
-                    Divider().padding(.leading, 44)
-                    toggleRow(icon: "hand.raised.fill", label: L.breakConfirm, isOn: $state.config.breakConfirm)
-                    Divider().padding(.leading, 44)
-                    soundRow(
-                        icon: "speaker.wave.2.fill",
-                        label: L.reminderSound,
-                        isOn: $state.config.soundEnabled,
-                        sound: $state.config.alertSound
-                    )
-                    Divider().padding(.leading, 44)
-                    soundRow(
-                        icon: "ear.fill",
-                        label: L.activityDetectSound,
-                        isOn: $state.config.breakDetectSound,
-                        sound: $state.config.breakDetectSoundName
-                    )
-                    Divider().padding(.leading, 44)
-                    shortcutRow
-                }
-                .padding(.vertical, 4)
                 .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
 
                 // Work Days + Work Hours + Quiet Hours
@@ -572,8 +538,77 @@ struct AppTab: View {
         }
     }
 
+    private func sliderRow(icon: String, label: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            HStack {
+                Image(systemName: icon).font(.callout).foregroundStyle(color).frame(width: 20)
+                Text(label).font(.callout)
+                Spacer()
+                Text("\(Int(value.wrappedValue)) \(unit)")
+                    .font(.callout.monospacedDigit().bold())
+                    .foregroundStyle(color)
+                    .frame(width: 70, alignment: .trailing)
+            }
+            Slider(value: value, in: range, step: 1).tint(color)
+        }
+    }
+
+}
+
+// MARK: - Break Tab
+
+struct BreakTab: View {
+    @Environment(AppState.self) var state
+    @State private var showShortcutHelp = false
+
+    var body: some View {
+        @Bindable var state = state
+        VStack(spacing: 12) {
+            VStack(spacing: 0) {
+                pickerRow(icon: "rectangle.inset.filled", label: L.breakWindow) {
+                    Picker("", selection: $state.config.breakPosition) {
+                        ForEach(BreakPosition.allCases, id: \.self) { pos in
+                            Text(pos.label).tag(pos)
+                        }
+                    }
+                    .labelsHidden()
+                    Button {
+                        state.overlayManager.preview(position: state.config.breakPosition)
+                    } label: {
+                        Text(L.preview)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.blue)
+                    }
+                    .buttonStyle(.borderless)
+                }
+                Divider().padding(.leading, 44)
+                toggleRow(icon: "hand.raised.fill", label: L.breakConfirm, isOn: $state.config.breakConfirm)
+                Divider().padding(.leading, 44)
+                soundRow(
+                    icon: "speaker.wave.2.fill",
+                    label: L.reminderSound,
+                    isOn: $state.config.soundEnabled,
+                    sound: $state.config.alertSound
+                )
+                Divider().padding(.leading, 44)
+                soundRow(
+                    icon: "ear.fill",
+                    label: L.activityDetectSound,
+                    isOn: $state.config.breakDetectSound,
+                    sound: $state.config.breakDetectSoundName
+                )
+                Divider().padding(.leading, 44)
+                shortcutRow
+            }
+            .padding(.vertical, 4)
+            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .padding(16)
+    }
+
     @ViewBuilder
     private var shortcutRow: some View {
+        @Bindable var state = state
         HStack(spacing: 10) {
             Image(systemName: "keyboard.fill")
                 .font(.callout)
@@ -609,21 +644,6 @@ struct AppTab: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-    }
-
-    private func sliderRow(icon: String, label: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            HStack {
-                Image(systemName: icon).font(.callout).foregroundStyle(color).frame(width: 20)
-                Text(label).font(.callout)
-                Spacer()
-                Text("\(Int(value.wrappedValue)) \(unit)")
-                    .font(.callout.monospacedDigit().bold())
-                    .foregroundStyle(color)
-                    .frame(width: 70, alignment: .trailing)
-            }
-            Slider(value: value, in: range, step: 1).tint(color)
-        }
     }
 
     private func soundRow(icon: String, label: String, isOn: Binding<Bool>, sound: Binding<String>) -> some View {
@@ -677,12 +697,13 @@ struct AppTab: View {
 // MARK: - Reminders
 
 struct ReminderTab: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) var state
     @State private var newReminder = ""
     @State private var editingIndex: Int? = nil
     @State private var editingText = ""
 
     var body: some View {
+
         VStack(spacing: 16) {
             HStack {
                 Text(L.reminderHint)
@@ -789,10 +810,11 @@ struct ReminderTab: View {
 // MARK: - About
 
 struct AboutTab: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) var state
     @ObservedObject private var updater = UpdateChecker.shared
 
     var body: some View {
+
         VStack(spacing: 14) {
             Spacer()
 

@@ -6,7 +6,7 @@ enum HeatmapMode {
 }
 
 struct StatsWindowView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) var state
     @State private var heatmapMode: HeatmapMode = .checkIns
     @State private var selectedBarIndex: Int? = nil
     private let db = Database.shared

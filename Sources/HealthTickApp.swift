@@ -2,16 +2,18 @@ import SwiftUI
 
 @main
 struct HealthTickApp: App {
-    @StateObject private var state = AppState()
+    @State private var state = AppState()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
+
         MenuBarExtra {
             MenuView()
-                .environmentObject(state)
+                .environment(state)
         } label: {
-            Image(systemName: phaseSystemImage)
+            MenuBarLabel()
+                .environment(state)
         }
         .menuBarExtraStyle(.window)
         .onChange(of: state.showOnboarding) { _, show in
@@ -23,9 +25,9 @@ struct HealthTickApp: App {
 
         Window(L.settingsWindow, id: "preferences") {
             SettingsView()
-                .environmentObject(state)
+                .environment(state)
         }
-        .defaultSize(width: 440, height: 460)
+        .defaultSize(width: 520, height: 460)
         .windowResizability(.contentSize)
         .windowToolbarStyle(.unified)
         .commands {
@@ -79,19 +81,32 @@ struct HealthTickApp: App {
 
         Window(L.statsWindow, id: "stats") {
             StatsWindowView()
-                .environmentObject(state)
+                .environment(state)
         }
         .defaultSize(width: 780, height: 620)
 
         Window(L.onboardingWindow, id: "onboarding") {
             OnboardingView()
-                .environmentObject(state)
+                .environment(state)
         }
         .defaultSize(width: 500, height: 450)
         .windowResizability(.contentSize)
     }
 
+    private func bringToFront() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+}
+
+struct MenuBarLabel: View {
+    @Environment(AppState.self) var state
     private static let isDev = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
+
+    var body: some View {
+        Image(systemName: phaseSystemImage)
+    }
 
     private var phaseSystemImage: String {
         if Self.isDev {
@@ -109,12 +124,6 @@ struct HealthTickApp: App {
         case .paused: return "pause.circle"
         }
     }
-
-    private func bringToFront() {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {

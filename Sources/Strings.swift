@@ -87,8 +87,9 @@ struct L {
 
     // MARK: - Settings - Tabs
     static var tabGeneral: String { isZh ? "通用" : "General" }
-    static var tabSystem: String { isZh ? "系统" : "System" }
-    static var tabApp: String { isZh ? "应用" : "App" }
+    static var tabSystem: String { isZh ? "通用" : "General" }
+    static var tabApp: String { isZh ? "计划" : "Plan" }
+    static var tabBreak: String { isZh ? "休息" : "Break" }
     static var tabReminders: String { isZh ? "提醒" : "Reminders" }
     static var tabAbout: String { isZh ? "关于" : "About" }
 

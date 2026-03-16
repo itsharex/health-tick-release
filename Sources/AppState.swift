@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 import AppKit
 import SwiftUI
 
@@ -218,30 +217,33 @@ enum AppPhase: String {
 }
 
 @MainActor
-final class AppState: ObservableObject {
-    @Published var config: AppConfig
-    @Published var phase: AppPhase = .working
-    @Published var remainingSeconds: Int = 0
-    @Published var todayDone: Int = 0
-    @Published var currentStreak: Int = 0
-    @Published var maxStreak: Int = 0
-    @Published var breakWarning: String = ""
-    @Published var breakSkipCount: Int = 0
+@Observable
+final class AppState {
+    var config: AppConfig {
+        didSet { scheduleAutoSave() }
+    }
+    var phase: AppPhase = .working
+    var remainingSeconds: Int = 0
+    var todayDone: Int = 0
+    var currentStreak: Int = 0
+    var maxStreak: Int = 0
+    var breakWarning: String = ""
+    var breakSkipCount: Int = 0
     let breakSkipNeeded = 3
     var lastSkipClickTime: Date?
-    @Published var weekData: [(String, Int)] = []
-    @Published var totalCount: Int = 0
-    @Published var todayWorkMinutes: Int = 0
-    @Published var weekWorkData: [(String, Int)] = []
-    @Published var isInQuietHours: Bool = false
+    var weekData: [(String, Int)] = []
+    var totalCount: Int = 0
+    var todayWorkMinutes: Int = 0
+    var weekWorkData: [(String, Int)] = []
+    var isInQuietHours: Bool = false
 
-    @Published var overtimeActive: Bool = false
-    @Published var showOnboarding: Bool = false
-    @Published var currentBreakActivity: BreakActivity?
-    @Published var currentReminder: String?
-    @Published var celebrateBadge: Badge?
-    @Published var todaySkipCount: Int = 0
-    @Published var quietRemainingSeconds: Int = 0
+    var overtimeActive: Bool = false
+    var showOnboarding: Bool = false
+    var currentBreakActivity: BreakActivity?
+    var currentReminder: String?
+    var celebrateBadge: Badge?
+    var todaySkipCount: Int = 0
+    var quietRemainingSeconds: Int = 0
 
     private var currentSessionId: Int64?
     private var currentSessionWorkConfig: Int = 0  // work_minutes at session creation
@@ -259,7 +261,7 @@ final class AppState: ObservableObject {
     private let db = Database.shared
     var overlayManager = BreakOverlayManager()
 
-    private var configWatcher: AnyCancellable?
+    private var autoSaveTimer: Timer?
     private var lastSavedConfig: AppConfig?
     private var localMonitor: Any?
 
@@ -274,7 +276,10 @@ final class AppState: ObservableObject {
     init() {
         config = db.loadConfig()
         L.lang = config.language
-        Self.applyAppearance(config.appearance)
+        // Defer appearance application — NSApp may not be ready during init
+        DispatchQueue.main.async { [config] in
+            Self.applyAppearance(config.appearance)
+        }
         lastSavedConfig = config
         overlayManager.appState = self
         overlayManager.onForceEnd = { [weak self] in
@@ -320,12 +325,6 @@ final class AppState: ObservableObject {
             }
         }
 
-        // Auto-save when config changes
-        configWatcher = $config
-            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-            .sink { [weak self] newConfig in
-                self?.autoSave(newConfig)
-            }
     }
 
     // MARK: - Timer State Persistence
@@ -666,13 +665,26 @@ final class AppState: ObservableObject {
         celebrationWindow = panel
     }
 
-    @Published var showRestartPrompt = false
+    var showRestartPrompt = false
     var suppressNextRestartPrompt = false
+
+    private func scheduleAutoSave() {
+        autoSaveTimer?.invalidate()
+        autoSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.autoSave(self.config)
+            }
+        }
+    }
 
     private func autoSave(_ newConfig: AppConfig) {
         guard let old = lastSavedConfig, newConfig != old else { return }
         db.saveConfig(newConfig)
-        refreshStats()
+        // Only refresh stats when goal changes (affects streak/progress display)
+        if newConfig.dailyGoal != old.dailyGoal {
+            refreshStats()
+        }
         lastSavedConfig = newConfig
 
         if newConfig.language != old.language {

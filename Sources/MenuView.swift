@@ -1,109 +1,34 @@
 import SwiftUI
+import AppKit
+
+// MARK: - Menu View (parent shell — reads only phase & isInQuietHours, both change infrequently)
 
 struct MenuView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) var state
     @Environment(\.openWindow) private var openWindow
-    /// Whether to show the shared BreakCardView (alerting, breaking, or waiting)
-    /// Quiet hours override: never show break UI during quiet hours
+
     private var isBreakPhase: Bool {
         !state.isInQuietHours && (state.phase == .alerting || state.phase == .breaking || state.phase == .waiting)
     }
 
     var body: some View {
+
         VStack(spacing: 12) {
-            // Goal reached indicator
-            if state.todayDone >= state.config.dailyGoal {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.green)
-                    Text(L.dailyGoalReached)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.green)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.green.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-            }
-
-            // Skip warning indicator
-            if state.todaySkipCount >= 3 {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.orange)
-                    Text(L.skipWarningMenu)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.orange)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-            }
-
-            // Quiet hours indicator
-            if state.isInQuietHours {
-                HStack(spacing: 6) {
-                    Image(systemName: "moon.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.purple)
-                    Text(L.quietHoursActive)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.purple)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.purple.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-            }
+            // Header indicators (own observation scope)
+            MenuHeaderView()
 
             if isBreakPhase {
-                // Shared break/alerting/waiting UI (same component used by floating & fullscreen)
                 BreakCardView()
             } else {
-                // Normal working/paused state
-                ZStack {
-                    Circle()
-                        .stroke(.quaternary, lineWidth: 3)
-                    Circle()
-                        .trim(from: 0, to: timerProgress)
-                        .stroke(
-                            phaseColor.gradient,
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
+                // Timer circle — only this re-renders every second
+                MenuTimerCircle()
 
-                    VStack(spacing: 2) {
-                        if state.isInQuietHours {
-                            Button {
-                                state.activateOvertime()
-                            } label: {
-                                VStack(spacing: 4) {
-                                    Image(systemName: "bolt.fill")
-                                        .font(.system(size: 18))
-                                    Text(L.continueWorking)
-                                        .font(.system(size: 11, weight: .medium))
-                                }
-                                .foregroundStyle(.orange)
-                            }
-                            .buttonStyle(.borderless)
-                            .handCursor()
-                        } else {
-                            Text(state.formattedTime)
-                                .font(.system(size: 28, weight: .light, design: .monospaced))
-                            Text(state.phaseLabel)
-                                .font(.system(size: 13))
-                                .foregroundStyle(.primary.opacity(0.6))
-                        }
-                    }
-                }
-                .frame(width: 120, height: 120)
-                .padding(.top, 4)
-
-                normalContent
+                // Stats — re-renders only when stats change (infrequent)
+                MenuStatsContent()
 
                 Divider().padding(.horizontal, 4)
 
-                normalControls
+                MenuControls()
             }
 
             Divider().padding(.horizontal, 4)
@@ -122,13 +47,144 @@ struct MenuView: View {
         .padding(16)
         .frame(width: 240)
         .onAppear {
-            bringOtherWindowsToFront()
+            menuBringOtherWindowsToFront()
+        }
+    }
+}
+
+// MARK: - Header Indicators (goal reached, skip warning, quiet hours)
+
+private struct MenuHeaderView: View {
+    @Environment(AppState.self) var state
+
+    var body: some View {
+
+        Group {
+            if state.todayDone >= state.config.dailyGoal {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.green)
+                    Text(L.dailyGoalReached)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.green)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.green.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            if state.todaySkipCount >= 3 {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                    Text(L.skipWarningMenu)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.orange)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            if state.isInQuietHours {
+                HStack(spacing: 6) {
+                    Image(systemName: "moon.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.purple)
+                    Text(L.quietHoursActive)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.purple)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.purple.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+}
+
+// MARK: - Timer Circle (the ONLY view that re-renders every second)
+
+private struct MenuTimerCircle: View {
+    @Environment(AppState.self) var state
+
+    private var timerProgress: Double {
+        if state.isInQuietHours {
+            guard state.quietRemainingSeconds > 0 else { return 0 }
+            let maxDisplay = 3600.0
+            return min(1.0, Double(state.quietRemainingSeconds) / maxDisplay)
+        }
+        let total: Int
+        if state.phase == .working || (state.phase == .paused && state.remainingSeconds > 0) {
+            total = state.config.workMinutes * 60
+        } else {
+            return 0
+        }
+        guard total > 0 else { return 0 }
+        return Double(state.remainingSeconds) / Double(total)
+    }
+
+    private var phaseColor: Color {
+        if state.isInQuietHours { return .orange }
+        switch state.phase {
+        case .working: return .green
+        case .breaking: return .orange
+        case .alerting: return .red
+        case .paused: return .orange
+        case .waiting: return .blue
         }
     }
 
-    // MARK: - Normal Content
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(.quaternary, lineWidth: 3)
+            Circle()
+                .trim(from: 0, to: timerProgress)
+                .stroke(
+                    phaseColor.gradient,
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
 
-    private var normalContent: some View {
+            VStack(spacing: 2) {
+                if state.isInQuietHours {
+                    Button {
+                        state.activateOvertime()
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 18))
+                            Text(L.continueWorking)
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundStyle(.orange)
+                    }
+                    .buttonStyle(.borderless)
+                    .handCursor()
+                } else {
+                    Text(state.formattedTime)
+                        .font(.system(size: 28, weight: .light, design: .monospaced))
+                    Text(state.phaseLabel)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary.opacity(0.6))
+                }
+            }
+        }
+        .frame(width: 120, height: 120)
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - Stats Content (re-renders only when stats/config change — NOT every second)
+
+private struct MenuStatsContent: View {
+    @Environment(AppState.self) var state
+
+    var body: some View {
+
         Group {
             // Today progress
             HStack(spacing: 16) {
@@ -186,7 +242,7 @@ struct MenuView: View {
 
                 Button {
                     ShareManager.showPreview(state: state)
-                    dismissMenuPanel()
+                    menuDismissPanel()
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 10))
@@ -202,14 +258,14 @@ struct MenuView: View {
                 ForEach(Array(state.weekData.enumerated()), id: \.offset) { _, item in
                     VStack(spacing: 3) {
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(pixelColor(count: item.1, goal: state.config.dailyGoal))
+                            .fill(menuPixelColor(count: item.1, goal: state.config.dailyGoal))
                             .frame(width: 22, height: 22)
                             .overlay(
                                 Text("\(item.1)")
                                     .font(.system(size: 9, weight: .medium, design: .monospaced))
                                     .foregroundStyle(item.1 > 0 ? .white : .clear)
                             )
-                        Text(shortDay(item.0))
+                        Text(menuShortDay(item.0))
                             .font(.system(size: 8))
                             .foregroundStyle(.primary.opacity(0.45))
                     }
@@ -265,8 +321,16 @@ struct MenuView: View {
             }
         }
     }
+}
 
-    private var normalControls: some View {
+// MARK: - Controls (pause/reset/achievements/help/settings)
+
+private struct MenuControls: View {
+    @Environment(AppState.self) var state
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+
         HStack {
             controlButton(
                 title: state.phase == .paused ? L.resume : L.pause,
@@ -282,53 +346,22 @@ struct MenuView: View {
             Spacer()
 
             controlButton(title: L.achievements, icon: "trophy") {
-                dismissMenuPanel()
+                menuDismissPanel()
                 openWindow(id: "stats")
-                bringToFront()
+                menuBringToFront()
             }
 
             controlButton(title: L.help, icon: "questionmark.circle") {
-                dismissMenuPanel()
+                menuDismissPanel()
                 openWindow(id: "helpguide")
-                bringToFront()
+                menuBringToFront()
             }
 
             controlButton(title: L.settings, icon: "gear") {
-                dismissMenuPanel()
+                menuDismissPanel()
                 openWindow(id: "preferences")
-                bringToFront()
+                menuBringToFront()
             }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var timerProgress: Double {
-        if state.isInQuietHours {
-            // Show quiet hours countdown progress (draining down)
-            guard state.quietRemainingSeconds > 0 else { return 0 }
-            // Cap at 1 hour for visual progress; longer periods show partial ring
-            let maxDisplay = 3600.0
-            return min(1.0, Double(state.quietRemainingSeconds) / maxDisplay)
-        }
-        let total: Int
-        if state.phase == .working || (state.phase == .paused && state.remainingSeconds > 0) {
-            total = state.config.workMinutes * 60
-        } else {
-            return 0
-        }
-        guard total > 0 else { return 0 }
-        return Double(state.remainingSeconds) / Double(total)
-    }
-
-    private var phaseColor: Color {
-        if state.isInQuietHours { return .orange }
-        switch state.phase {
-        case .working: return .green
-        case .breaking: return .orange
-        case .alerting: return .red
-        case .paused: return .orange
-        case .waiting: return .blue
         }
     }
 
@@ -346,48 +379,50 @@ struct MenuView: View {
         .buttonStyle(.borderless)
         .handCursor()
     }
+}
 
-    private func dismissMenuPanel() {
-        for window in NSApp.windows {
-            guard let panel = window as? NSPanel else { continue }
-            if panel.styleMask.contains(.nonactivatingPanel),
-               panel.styleMask.contains(.fullSizeContentView),
-               panel.frame.width < 350 {
-                panel.orderOut(nil)
-                break
+// MARK: - File-level helpers (shared by sub-views)
+
+private func menuDismissPanel() {
+    for window in NSApp.windows {
+        guard let panel = window as? NSPanel else { continue }
+        if panel.styleMask.contains(.nonactivatingPanel),
+           panel.styleMask.contains(.fullSizeContentView),
+           panel.frame.width < 350 {
+            panel.orderOut(nil)
+            break
+        }
+    }
+}
+
+private func menuBringToFront() {
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+}
+
+private func menuBringOtherWindowsToFront() {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        let hasVisible = NSApp.windows.contains { w in
+            w.isVisible && !(w is NSPanel) && !w.title.isEmpty && w.styleMask.contains(.titled)
+        }
+        if hasVisible {
+            for w in NSApp.windows where w.isVisible && !(w is NSPanel) && !w.title.isEmpty && w.styleMask.contains(.titled) {
+                w.orderFrontRegardless()
             }
         }
     }
+}
 
-    private func bringToFront() {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-    }
+private func menuPixelColor(count: Int, goal: Int) -> Color {
+    if count == 0 { return Color.gray.opacity(0.15) }
+    let ratio = Double(count) / Double(max(goal, 1))
+    if ratio >= 1.0 { return .green }
+    if ratio >= 0.5 { return .green.opacity(0.55) }
+    return .green.opacity(0.3)
+}
 
-    private func bringOtherWindowsToFront() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            let hasVisible = NSApp.windows.contains { w in
-                w.isVisible && !(w is NSPanel) && !w.title.isEmpty && w.styleMask.contains(.titled)
-            }
-            if hasVisible {
-                for w in NSApp.windows where w.isVisible && !(w is NSPanel) && !w.title.isEmpty && w.styleMask.contains(.titled) {
-                    w.orderFrontRegardless()
-                }
-            }
-        }
-    }
-
-    private func pixelColor(count: Int, goal: Int) -> Color {
-        if count == 0 { return Color.gray.opacity(0.15) }
-        let ratio = Double(count) / Double(max(goal, 1))
-        if ratio >= 1.0 { return .green }
-        if ratio >= 0.5 { return .green.opacity(0.55) }
-        return .green.opacity(0.3)
-    }
-
-    private func shortDay(_ dateStr: String) -> String {
-        let parts = dateStr.split(separator: "-")
-        guard parts.count == 3, let d = Int(parts[2]) else { return "" }
-        return "\(d)"
-    }
+private func menuShortDay(_ dateStr: String) -> String {
+    let parts = dateStr.split(separator: "-")
+    guard parts.count == 3, let d = Int(parts[2]) else { return "" }
+    return "\(d)"
 }

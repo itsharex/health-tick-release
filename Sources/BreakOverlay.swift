@@ -5,7 +5,7 @@ import Foundation
 // MARK: - Shared Break Card View (single source of truth for ALL break UIs)
 
 struct BreakCardView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) var state
     var fullscreen: Bool = false
 
     private var timerProgress: Double {
@@ -16,6 +16,7 @@ struct BreakCardView: View {
     }
 
     var body: some View {
+
         VStack(spacing: fullscreen ? 20 : 12) {
             switch state.phase {
             case .alerting:
@@ -316,7 +317,8 @@ final class BreakOverlayManager {
     }
 
     private func findMenuBarExtraPanel() {
-        for window in NSApp.windows {
+        guard let app = NSApp else { return }
+        for window in app.windows {
             guard let panel = window as? NSPanel else { continue }
             if panel is KeyablePanel { continue }
             if panel.styleMask.contains(.nonactivatingPanel)
@@ -359,7 +361,8 @@ final class BreakOverlayManager {
     }
 
     private func closeMenuBarExtra() {
-        for window in NSApp.windows {
+        guard let app = NSApp else { return }
+        for window in app.windows {
             guard let panel = window as? NSPanel else { continue }
             if panel is KeyablePanel { continue }
             if panel.styleMask.contains(.nonactivatingPanel),
@@ -378,7 +381,7 @@ final class BreakOverlayManager {
 
         // Auto-size from SwiftUI content
         let cardView = BreakCardView()
-            .environmentObject(state)
+            .environment(state)
         let sizingView = NSHostingView(rootView: cardView)
         let fitted = sizingView.fittingSize
         let pw = ceil(fitted.width)
@@ -446,7 +449,7 @@ final class BreakOverlayManager {
 
             let fullscreenView = BreakCardView(fullscreen: true)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .environmentObject(state)
+            .environment(state)
 
             let hostingView = NSHostingView(rootView: fullscreenView)
             hostingView.frame = frame
@@ -456,7 +459,7 @@ final class BreakOverlayManager {
             p.makeKeyAndOrderFront(nil)
             windows.append(p)
         }
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp?.activate(ignoringOtherApps: true)
     }
 
     // MARK: - Monitoring
