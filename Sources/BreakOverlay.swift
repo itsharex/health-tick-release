@@ -143,6 +143,7 @@ struct BreakCardView: View {
                     in: RoundedRectangle(cornerRadius: 8)
                 )
         }
+        .disabled(state.isPreview)
         .buttonStyle(.borderless)
     }
 
@@ -278,6 +279,7 @@ final class BreakOverlayManager {
 
         appState?.currentBreakActivity = breakActivities.randomElement()
         appState?.currentReminder = appState?.config.reminders.randomElement() ?? L.defaultBreakReminder
+        appState?.isPreview = true
         appState?.phase = .breaking
         appState?.remainingSeconds = remaining
         appState?.breakWarning = ""
@@ -295,6 +297,7 @@ final class BreakOverlayManager {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.hide()
+            self?.appState?.isPreview = false
             self?.appState?.currentBreakActivity = savedActivity
             self?.appState?.currentReminder = savedReminder
             self?.appState?.phase = savedPhase ?? .working

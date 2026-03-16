@@ -229,6 +229,7 @@ final class AppState {
     var maxStreak: Int = 0
     var breakWarning: String = ""
     var breakSkipCount: Int = 0
+    var isPreview: Bool = false
     let breakSkipNeeded = 3
     var lastSkipClickTime: Date?
     var weekData: [(String, Int)] = []
