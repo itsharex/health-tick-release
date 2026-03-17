@@ -2,6 +2,19 @@ import AppKit
 import SwiftUI
 import Foundation
 
+// MARK: - Native Visual Effect Background (matches system MenuBarExtra)
+
+struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = .popover
+        v.state = .active
+        v.blendingMode = .withinWindow
+        return v
+    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
 // MARK: - Shared Break Card View (single source of truth for ALL break UIs)
 
 struct BreakCardView: View {
@@ -16,117 +29,280 @@ struct BreakCardView: View {
     }
 
     var body: some View {
-
-        VStack(spacing: fullscreen ? 20 : 12) {
-            switch state.phase {
-            case .alerting:
-                alertingBody
-            case .waiting:
-                waitingBody
-            case .breaking:
-                breakBody
-            default:
-                EmptyView()
+        if fullscreen {
+            VStack(spacing: 20) {
+                switch state.phase {
+                case .alerting: alertingBody
+                case .waiting: waitingBody
+                case .breaking: breakBody
+                default: EmptyView()
+                }
             }
+            .padding(40)
+        } else {
+            VStack(spacing: 0) {
+                switch state.phase {
+                case .alerting: floatingAlertingBody
+                case .waiting: floatingWaitingBody
+                case .breaking: floatingBreakBody
+                default: EmptyView()
+                }
+            }
+            .frame(width: 240)
         }
-        .padding(fullscreen ? 40 : 16)
-        .frame(width: fullscreen ? nil : 240)
     }
 
-    // MARK: - Alerting (pre-break confirmation)
+    // MARK: - Floating: Alerting
 
     @ViewBuilder
-    private var alertingBody: some View {
+    private var floatingAlertingBody: some View {
         Image(systemName: "bell.badge.fill")
-            .font(.system(size: fullscreen ? 64 : 44))
+            .font(.system(size: 40))
             .foregroundStyle(.orange)
-            .padding(.top, fullscreen ? 16 : 16)
+            .padding(.top, 28)
 
         if let reminder = state.currentReminder {
             Text(reminder)
-                .font(fullscreen ? .title3.bold() : .callout.bold())
-                .foregroundStyle(fullscreen ? .white.opacity(0.85) : .primary.opacity(0.8))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.primary.opacity(0.85))
                 .multilineTextAlignment(.center)
-                .padding(.bottom, fullscreen ? 0 : 4)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
         }
 
         Button {
             state.confirmBreak()
         } label: {
             Text(L.alertConfirmBreak)
-                .font(.system(size: fullscreen ? 18 : 14, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(maxWidth: fullscreen ? 280 : .infinity)
-                .padding(.vertical, fullscreen ? 12 : 8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
                 .background(.orange.gradient, in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.borderless)
-        .padding(.horizontal, fullscreen ? 0 : 20)
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
 
         if state.config.shortcutEnabled {
             Text(L.shortcutQuickConfirm(state.config.shortcutDisplay))
-                .font(.system(size: fullscreen ? 12 : 10))
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary.opacity(0.5))
+                .padding(.top, 6)
+        }
+
+        Spacer().frame(height: 24)
+    }
+
+    // MARK: - Floating: Break
+
+    @ViewBuilder
+    private var floatingBreakBody: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.gray.opacity(0.15), lineWidth: 4)
+            Circle()
+                .trim(from: 0, to: timerProgress)
+                .stroke(
+                    Color.orange.gradient,
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: 4) {
+                Text(state.formattedTime)
+                    .font(.system(size: 32, weight: .light, design: .monospaced))
+                    .foregroundStyle(.primary)
+                Text(state.phaseLabel)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 130, height: 130)
+        .padding(.top, 28)
+
+        if let reminder = state.currentReminder {
+            Text(reminder)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary.opacity(0.75))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+        }
+
+        VStack(spacing: 8) {
+            if let activity = state.currentBreakActivity {
+                Label {
+                    Text(activity.text)
+                        .font(.system(size: 12))
+                } icon: {
+                    Image(systemName: activity.icon)
+                        .font(.system(size: 12))
+                }
+                .foregroundStyle(.green.opacity(0.75))
+            }
+
+            if !state.breakWarning.isEmpty {
+                Label {
+                    Text(state.breakWarning)
+                        .font(.system(size: 11))
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(.orange.opacity(0.9))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .padding(.top, 14)
+
+        Button {
+            state.skipBreakClicked()
+        } label: {
+            Text(L.skipButton(state.breakSkipCount, state.breakSkipNeeded))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary.opacity(0.6))
-                .padding(.bottom, fullscreen ? 0 : 8)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 5)
+        }
+        .disabled(state.isPreview)
+        .buttonStyle(.borderless)
+        .padding(.top, 14)
+
+        Spacer().frame(height: 24)
+    }
+
+    // MARK: - Floating: Waiting
+
+    @ViewBuilder
+    private var floatingWaitingBody: some View {
+        Image(systemName: "checkmark.circle.fill")
+            .font(.system(size: 40))
+            .foregroundStyle(.green)
+            .padding(.top, 32)
+
+        Text(L.breakOverReturnPrompt)
+            .font(.system(size: 14))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+
+        Button {
+            state.confirmReturn()
+        } label: {
+            Text(L.alertImBack)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(.green.gradient, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+
+        if state.config.shortcutEnabled {
+            Text(L.shortcutQuickConfirm(state.config.shortcutDisplay))
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary.opacity(0.5))
+                .padding(.top, 8)
+        }
+
+        Spacer().frame(height: 28)
+    }
+
+    // MARK: - Fullscreen: Alerting
+
+    @ViewBuilder
+    private var alertingBody: some View {
+        Image(systemName: "bell.badge.fill")
+            .font(.system(size: 64))
+            .foregroundStyle(.orange)
+            .padding(.top, 16)
+
+        if let reminder = state.currentReminder {
+            Text(reminder)
+                .font(.title3.bold())
+                .foregroundStyle(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+        }
+
+        Button {
+            state.confirmBreak()
+        } label: {
+            Text(L.alertConfirmBreak)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: 280)
+                .padding(.vertical, 12)
+                .background(.orange.gradient, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.borderless)
+
+        if state.config.shortcutEnabled {
+            Text(L.shortcutQuickConfirm(state.config.shortcutDisplay))
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary.opacity(0.6))
         }
     }
 
-    // MARK: - Break content (circular timer)
+    // MARK: - Fullscreen: Break
 
     @ViewBuilder
     private var breakBody: some View {
         ZStack {
             Circle()
-                .stroke(Color.gray.opacity(fullscreen ? 0.3 : 0.2), lineWidth: fullscreen ? 5 : 3)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 5)
             Circle()
                 .trim(from: 0, to: timerProgress)
                 .stroke(
                     Color.orange.gradient,
-                    style: StrokeStyle(lineWidth: fullscreen ? 5 : 3, lineCap: .round)
+                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
 
-            VStack(spacing: fullscreen ? 6 : 2) {
+            VStack(spacing: 6) {
                 Text(state.formattedTime)
-                    .font(.system(size: fullscreen ? 64 : 28, weight: .light, design: .monospaced))
-                    .foregroundStyle(fullscreen ? .white : .primary)
+                    .font(.system(size: 64, weight: .light, design: .monospaced))
+                    .foregroundStyle(.white)
                 Text(state.phaseLabel)
-                    .font(.system(size: fullscreen ? 18 : 13))
-                    .foregroundStyle(fullscreen ? .white.opacity(0.5) : .primary.opacity(0.6))
+                    .font(.system(size: 18))
+                    .foregroundStyle(.white.opacity(0.5))
             }
         }
-        .frame(width: fullscreen ? 240 : 120, height: fullscreen ? 240 : 120)
-        .padding(.top, fullscreen ? 8 : 4)
+        .frame(width: 240, height: 240)
+        .padding(.top, 8)
 
         if let reminder = state.currentReminder {
             Text(reminder)
-                .font(fullscreen ? .title3.bold() : .callout.bold())
-                .foregroundStyle(fullscreen ? .white.opacity(0.85) : .primary.opacity(0.7))
+                .font(.title3.bold())
+                .foregroundStyle(.white.opacity(0.85))
                 .multilineTextAlignment(.center)
         }
 
         if let activity = state.currentBreakActivity {
-            HStack(spacing: fullscreen ? 8 : 6) {
+            HStack(spacing: 8) {
                 Image(systemName: activity.icon)
-                    .font(.system(size: fullscreen ? 18 : 14))
-                    .foregroundStyle(fullscreen ? .green.opacity(0.85) : .green)
+                    .font(.system(size: 18))
                 Text(activity.text)
-                    .font(fullscreen ? .title3 : .callout)
-                    .foregroundStyle(fullscreen ? .green.opacity(0.85) : .green)
+                    .font(.title3)
             }
+            .foregroundStyle(.green.opacity(0.85))
         }
 
         if !state.breakWarning.isEmpty {
             HStack(spacing: 4) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: fullscreen ? 14 : 11))
-                    .foregroundStyle(.orange)
+                    .font(.system(size: 14))
                 Text(state.breakWarning)
-                    .font(fullscreen ? .callout : .caption)
-                    .foregroundStyle(.orange)
+                    .font(.callout)
             }
-            .padding(.horizontal, fullscreen ? 14 : 10)
-            .padding(.vertical, fullscreen ? 6 : 4)
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
             .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
         }
 
@@ -134,52 +310,46 @@ struct BreakCardView: View {
             state.skipBreakClicked()
         } label: {
             Text(L.skipButton(state.breakSkipCount, state.breakSkipNeeded))
-                .font(.system(size: fullscreen ? 14 : 11, weight: .medium))
-                .foregroundStyle(fullscreen ? .white.opacity(0.4) : .secondary)
-                .padding(.horizontal, fullscreen ? 20 : 12)
-                .padding(.vertical, fullscreen ? 8 : 4)
-                .background(
-                    Color.gray.opacity(fullscreen ? 0.25 : 0.15),
-                    in: RoundedRectangle(cornerRadius: 8)
-                )
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white.opacity(0.4))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .background(Color.gray.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
         }
         .disabled(state.isPreview)
         .buttonStyle(.borderless)
     }
 
-    // MARK: - Waiting (post-break confirmation)
+    // MARK: - Fullscreen: Waiting
 
     @ViewBuilder
     private var waitingBody: some View {
         Image(systemName: "checkmark.circle.fill")
-            .font(.system(size: fullscreen ? 64 : 44))
+            .font(.system(size: 64))
             .foregroundStyle(.green)
-            .padding(.top, fullscreen ? 16 : 16)
+            .padding(.top, 16)
 
         Text(L.breakOverReturnPrompt)
-            .font(fullscreen ? .title3 : .callout)
-            .foregroundStyle(fullscreen ? .white.opacity(0.7) : .secondary)
+            .font(.title3)
+            .foregroundStyle(.white.opacity(0.7))
             .multilineTextAlignment(.center)
-            .padding(.bottom, fullscreen ? 0 : 4)
 
         Button {
             state.confirmReturn()
         } label: {
             Text(L.alertImBack)
-                .font(.system(size: fullscreen ? 18 : 14, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(maxWidth: fullscreen ? 280 : .infinity)
-                .padding(.vertical, fullscreen ? 12 : 8)
+                .frame(maxWidth: 280)
+                .padding(.vertical, 12)
                 .background(.green.gradient, in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.borderless)
-        .padding(.horizontal, fullscreen ? 0 : 20)
 
         if state.config.shortcutEnabled {
             Text(L.shortcutQuickConfirm(state.config.shortcutDisplay))
-                .font(.system(size: fullscreen ? 12 : 10))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary.opacity(0.6))
-                .padding(.bottom, fullscreen ? 0 : 8)
         }
     }
 }
@@ -188,6 +358,27 @@ struct BreakCardView: View {
 
 private class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
+}
+
+/// NSHostingView subclass for floating break overlay:
+/// - Transparent background (isOpaque = false, clear layer)
+/// - allowsVibrancy for proper NSVisualEffectView blending
+/// - Auto-resizes its window when SwiftUI content changes
+/// NSHostingView subclass that auto-resizes its window when SwiftUI content changes size.
+private class AutoResizingHostingView<Content: View>: NSHostingView<Content> {
+    override func layout() {
+        super.layout()
+        guard let window else { return }
+        let fitted = fittingSize
+        let fw = ceil(fitted.width)
+        let fh = ceil(fitted.height)
+        let cur = window.frame.size
+        guard abs(cur.width - fw) > 1 || abs(cur.height - fh) > 1 else { return }
+        var frame = window.frame
+        frame.origin.y += cur.height - fh
+        frame.size = NSSize(width: fw, height: fh)
+        window.setFrame(frame, display: true, animate: false)
+    }
 }
 
 // MARK: - Idle Detection
@@ -382,11 +573,16 @@ final class BreakOverlayManager {
     private func createFloating(position: BreakPosition) {
         guard let screen = NSScreen.main, let state = appState else { return }
 
-        // Auto-size from SwiftUI content
+        let cornerRadius: CGFloat = 14
+
         let cardView = BreakCardView()
+            .background(VisualEffectBackground())
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
             .environment(state)
-        let sizingView = NSHostingView(rootView: cardView)
-        let fitted = sizingView.fittingSize
+
+        let hostingView = AutoResizingHostingView(rootView: cardView)
+        let fitted = hostingView.fittingSize
         let pw = ceil(fitted.width)
         let ph = ceil(fitted.height)
 
@@ -419,14 +615,15 @@ final class BreakOverlayManager {
         p.isOpaque = false
         p.backgroundColor = .clear
         p.isMovableByWindowBackground = true
-        p.hasShadow = true
+        p.hasShadow = false
+        p.appearance = NSApp?.appearance ?? NSApp?.effectiveAppearance
 
-        let hostingView = NSHostingView(
-            rootView: cardView
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-        )
         hostingView.frame = NSMakeRect(0, 0, pw, ph)
-        p.contentView!.addSubview(hostingView)
+        hostingView.autoresizingMask = [.width, .height]
+        hostingView.wantsLayer = true
+        hostingView.layer?.cornerRadius = cornerRadius
+        hostingView.layer?.masksToBounds = true
+        p.contentView = hostingView
 
         p.makeKeyAndOrderFront(nil)
         windows.append(p)

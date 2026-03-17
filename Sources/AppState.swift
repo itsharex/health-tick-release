@@ -152,6 +152,7 @@ struct AppConfig: Equatable {
     var workStartTime: String = "09:00"
     var workEndTime: String = "18:00"
     var shortcutEnabled: Bool = false
+    var autoPauseOnGoal: Bool = false
     var shortcutKeyCode: UInt16 = 36  // Return
     var shortcutModifiers: UInt = 1048576  // Command
 
@@ -239,6 +240,7 @@ final class AppState {
     var isInQuietHours: Bool = false
 
     var overtimeActive: Bool = false
+    var goalAutoStopped: Bool = false
     var showOnboarding: Bool = false
     var currentBreakActivity: BreakActivity?
     var currentReminder: String?
@@ -394,6 +396,7 @@ final class AppState {
     // MARK: - Timer
 
     func startWork() {
+        goalAutoStopped = false
         phase = .working
         currentSessionWorkConfig = config.workMinutes
         targetTime = Date().addingTimeInterval(Double(config.workMinutes * 60))
@@ -487,12 +490,10 @@ final class AppState {
         phase = .waiting
         remainingSeconds = 0
         breakWarning = ""
-        // For fullscreen: close overlay, pin menu bar to show waiting UI
-        // For floating/menuWindow: keep panels open, SwiftUI shows waiting content
-        if config.breakPosition == .fullscreen {
-            overlayManager.hide()
+        // Only pin menu bar for menuWindow mode; other modes have their own windows
+        if config.breakPosition == .menuWindow {
+            overlayManager.pinForAlert()
         }
-        overlayManager.pinForAlert()
 
         let actualSeconds: Int?
         if let start = breakStartDate {
@@ -518,7 +519,17 @@ final class AppState {
         let badge = pendingBadge
         pendingBadge = nil
 
-        startWork()
+        if config.autoPauseOnGoal && todayDone >= config.dailyGoal {
+            // Goal reached — show off-duty UI (like quiet hours)
+            currentSessionId = nil
+            goalAutoStopped = true
+            phase = .paused
+            remainingSeconds = 0
+            timer?.invalidate()
+            saveTimerState()
+        } else {
+            startWork()
+        }
 
         if let badge {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
@@ -526,6 +537,7 @@ final class AppState {
             }
         }
     }
+
 
     // MARK: - Pause / Reset
 
@@ -880,7 +892,8 @@ final class AppState {
         }
         db.closeOrphanSessions(beforeDate: Database.todayString())
 
-        // 6. Reset overtime & quiet hours
+        // 6. Reset overtime, quiet hours, goal auto-stop
+        goalAutoStopped = false
         overtimeActive = false
         db.saveFlag("overtime_active", value: false)
         isInQuietHours = false
@@ -913,6 +926,11 @@ final class AppState {
             }
         }
         checkQuietHours()
+    }
+
+    func resumeFromGoalStop() {
+        goalAutoStopped = false
+        startWork()
     }
 
     func activateOvertime() {

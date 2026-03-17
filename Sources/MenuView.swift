@@ -8,7 +8,7 @@ struct MenuView: View {
     @Environment(\.openWindow) private var openWindow
 
     private var isBreakPhase: Bool {
-        !state.isInQuietHours && (state.phase == .alerting || state.phase == .breaking || state.phase == .waiting)
+        !state.isInQuietHours && !state.goalAutoStopped && (state.phase == .alerting || state.phase == .breaking || state.phase == .waiting)
     }
 
     var body: some View {
@@ -88,7 +88,7 @@ private struct MenuHeaderView: View {
                 .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
             }
 
-            if state.isInQuietHours {
+            if state.isInQuietHours || state.goalAutoStopped {
                 HStack(spacing: 6) {
                     Image(systemName: "moon.fill")
                         .font(.system(size: 12))
@@ -110,8 +110,12 @@ private struct MenuHeaderView: View {
 private struct MenuTimerCircle: View {
     @Environment(AppState.self) var state
 
+    private var isOffDuty: Bool {
+        state.isInQuietHours || state.goalAutoStopped
+    }
+
     private var timerProgress: Double {
-        if state.isInQuietHours {
+        if isOffDuty {
             guard state.quietRemainingSeconds > 0 else { return 0 }
             let maxDisplay = 3600.0
             return min(1.0, Double(state.quietRemainingSeconds) / maxDisplay)
@@ -127,7 +131,7 @@ private struct MenuTimerCircle: View {
     }
 
     private var phaseColor: Color {
-        if state.isInQuietHours { return .orange }
+        if isOffDuty { return .orange }
         switch state.phase {
         case .working: return .green
         case .breaking: return .orange
@@ -150,9 +154,13 @@ private struct MenuTimerCircle: View {
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 2) {
-                if state.isInQuietHours {
+                if isOffDuty {
                     Button {
-                        state.activateOvertime()
+                        if state.goalAutoStopped {
+                            state.resumeFromGoalStop()
+                        } else {
+                            state.activateOvertime()
+                        }
                     } label: {
                         VStack(spacing: 4) {
                             Image(systemName: "bolt.fill")
@@ -336,7 +344,11 @@ private struct MenuControls: View {
                 title: state.phase == .paused ? L.resume : L.pause,
                 icon: state.phase == .paused ? "play.fill" : "pause.fill"
             ) {
-                state.togglePause()
+                if state.goalAutoStopped {
+                    state.resumeFromGoalStop()
+                } else {
+                    state.togglePause()
+                }
             }
 
             controlButton(title: L.resetAction, icon: "arrow.counterclockwise") {

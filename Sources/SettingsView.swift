@@ -610,6 +610,8 @@ struct BreakTab: View {
                 Divider().padding(.leading, 44)
                 toggleRow(icon: "hand.raised.fill", label: L.breakConfirm, isOn: $state.config.breakConfirm)
                 Divider().padding(.leading, 44)
+                toggleRow(icon: "flag.checkered", label: L.autoPauseOnGoal, isOn: $state.config.autoPauseOnGoal)
+                Divider().padding(.leading, 44)
                 soundRow(
                     icon: "speaker.wave.2.fill",
                     label: L.reminderSound,

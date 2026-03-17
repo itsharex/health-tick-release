@@ -128,6 +128,7 @@ final class Database {
                 case "work_hours_enabled": config.workHoursEnabled = value == "1"
                 case "work_start_time": config.workStartTime = value
                 case "work_end_time": config.workEndTime = value
+                case "auto_pause_on_goal": config.autoPauseOnGoal = value == "1"
                 case "shortcut_enabled": config.shortcutEnabled = value == "1"
                 case "shortcut_keycode": config.shortcutKeyCode = UInt16(value) ?? 36
                 case "shortcut_modifiers": config.shortcutModifiers = UInt(value) ?? 1048576
@@ -169,6 +170,7 @@ final class Database {
         let workDaysJSON = (try? JSONEncoder().encode(config.workDays))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[2,3,4,5,6]"
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('work_days', '\(workDaysJSON)')")
+        exec("INSERT OR REPLACE INTO config (key, value) VALUES ('auto_pause_on_goal', '\(config.autoPauseOnGoal ? "1" : "0")')")
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('shortcut_enabled', '\(config.shortcutEnabled ? "1" : "0")')")
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('shortcut_keycode', '\(config.shortcutKeyCode)')")
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('shortcut_modifiers', '\(config.shortcutModifiers)')")

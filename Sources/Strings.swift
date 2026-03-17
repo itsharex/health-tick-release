@@ -103,6 +103,7 @@ struct L {
     static var preview: String { isZh ? "预览" : "Preview" }
     static var badgeUnlocked: String { isZh ? "恭喜解锁新徽章！" : "Badge Unlocked!" }
     static var breakConfirm: String { isZh ? "休息前确认" : "Confirm Before Break" }
+    static var autoPauseOnGoal: String { isZh ? "完成目标后自动停止" : "Auto-stop When Goal Met" }
     static var reminderSound: String { isZh ? "提醒声音" : "Reminder Sound" }
     static var activityDetectSound: String { isZh ? "操作检测提示音" : "Activity Detection Sound" }
     static var alertSoundLabel: String { isZh ? "提醒声音" : "Alert Sound" }
