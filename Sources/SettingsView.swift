@@ -360,16 +360,67 @@ struct AppTab: View {
                         get: { Double(state.config.workMinutes) },
                         set: { state.config.workMinutes = Int($0) }
                     ), range: 1...120, unit: L.unitMinutes, color: .green)
+                    .opacity(state.config.eyeCareMode ? 0.5 : 1.0)
+                    .disabled(state.config.eyeCareMode)
 
-                    sliderRow(icon: "cup.and.saucer.fill", label: L.breakDuration, value: Binding(
-                        get: { Double(state.config.breakSeconds / 60) },
-                        set: { state.config.breakSeconds = Int($0) * 60 }
-                    ), range: 1...15, unit: L.unitMinutes, color: .orange)
+                    VStack(spacing: 4) {
+                        HStack {
+                            Image(systemName: "cup.and.saucer.fill").font(.callout).foregroundStyle(.orange).frame(width: 20)
+                            Text(L.breakDuration).font(.callout)
+                            Spacer()
+                            Text(formatBreakDuration(state.config.breakSeconds))
+                                .font(.callout.monospacedDigit().bold())
+                                .foregroundStyle(.orange)
+                                .frame(width: 90, alignment: .trailing)
+                        }
+                        Slider(value: Binding(
+                            get: { Double(state.config.breakSeconds) },
+                            set: { state.config.breakSeconds = Int($0) }
+                        ), in: 20...900, step: 10).tint(.orange)
+                    }
+                    .opacity(state.config.eyeCareMode ? 0.5 : 1.0)
+                    .disabled(state.config.eyeCareMode)
 
                     sliderRow(icon: "target", label: L.dailyGoal, value: Binding(
                         get: { Double(state.config.dailyGoal) },
                         set: { state.config.dailyGoal = Int($0) }
                     ), range: 1...20, unit: L.unitTimes, color: .blue)
+
+                    Divider().padding(.vertical, 4)
+
+                    VStack(spacing: 4) {
+                        HStack {
+                            Image(systemName: "eye").font(.callout).foregroundStyle(.cyan).frame(width: 20)
+                            Text(L.eyeCareMode).font(.callout)
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { state.config.eyeCareMode },
+                                set: { newValue in
+                                    if newValue {
+                                        state.config.savedWorkMinutes = state.config.workMinutes
+                                        state.config.savedBreakSeconds = state.config.breakSeconds
+                                        state.config.savedBreakConfirm = state.config.breakConfirm
+                                        state.config.eyeCareMode = true
+                                        state.config.workMinutes = 20
+                                        state.config.breakSeconds = 20
+                                        state.config.breakConfirm = false
+                                    } else {
+                                        state.config.eyeCareMode = false
+                                        state.config.workMinutes = state.config.savedWorkMinutes
+                                        state.config.breakSeconds = state.config.savedBreakSeconds
+                                        state.config.breakConfirm = state.config.savedBreakConfirm
+                                    }
+                                }
+                            ))
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        }
+                        Text(L.eyeCareDesc)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 24)
+                    }
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
@@ -576,6 +627,16 @@ struct AppTab: View {
                     .frame(width: 70, alignment: .trailing)
             }
             Slider(value: value, in: range, step: 1).tint(color)
+        }
+    }
+
+    private func formatBreakDuration(_ seconds: Int) -> String {
+        if seconds < 60 {
+            return "\(seconds) \(L.unitSeconds)"
+        } else if seconds % 60 == 0 {
+            return "\(seconds / 60) \(L.unitMinutes)"
+        } else {
+            return "\(seconds / 60)\(L.unitMinutes)\(seconds % 60)\(L.unitSeconds)"
         }
     }
 
