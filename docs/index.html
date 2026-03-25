@@ -237,7 +237,7 @@ footer { padding: 60px 0; border-top: 1px solid var(--green-100); margin-top: 40
   <div class="hero-content">
     <div class="hero-logo-wrap">
       <img src="logo.svg" alt="HealthTick" class="hero-logo">
-      <span class="hero-version">v1.5.0</span>
+      <span class="hero-version" id="app-version">v1.6.0</span>
     </div>
     <div class="hero-badge">macOS 14+ &nbsp;·&nbsp; 免费 &nbsp;·&nbsp; 开源</div>
     <h1>关爱健康，从每一次<span class="accent">休息</span>开始</h1>
@@ -396,6 +396,10 @@ footer { padding: 60px 0; border-top: 1px solid var(--green-100); margin-top: 40
 </footer>
 
 <script>
+fetch('https://api.github.com/repos/lifedever/health-tick-release/releases/latest')
+  .then(r => r.json())
+  .then(d => { if (d.tag_name) document.getElementById('app-version').textContent = d.tag_name; })
+  .catch(() => {});
 const nav = document.getElementById('nav');
 window.addEventListener('scroll', () => { nav.classList.toggle('scrolled', window.scrollY > 40); });
 const observer = new IntersectionObserver((entries) => { entries.forEach((entry, i) => { if (entry.isIntersecting) { setTimeout(() => entry.target.classList.add('visible'), i * 80); observer.unobserve(entry.target); } }); }, { threshold: 0.15 });
