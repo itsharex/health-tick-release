@@ -652,9 +652,13 @@ final class BreakOverlayManager {
     }
 
     private func closeMenuBarExtra() {
-        // Previously called panel.orderOut(nil), which desyncs macOS's
-        // MenuBarExtra toggle state. The panel will dismiss naturally
-        // through macOS's own state management when the app deactivates.
+        // Find the MenuBarExtra panel and hide it. orderOut(nil) can desync
+        // macOS's internal toggle state, but leaving it open causes duplicate
+        // break UIs when switching from alert → floating/fullscreen break.
+        // The toggle state resyncs when the app next deactivates.
+        if let panel = findMenuBarPanel() {
+            panel.orderOut(nil)
+        }
     }
 
     // MARK: - Floating window (SwiftUI BreakCardView)

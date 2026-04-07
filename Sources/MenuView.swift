@@ -8,7 +8,17 @@ struct MenuView: View {
     @Environment(\.openWindow) private var openWindow
 
     private var isBreakPhase: Bool {
-        !state.isInQuietHours && !state.goalAutoStopped && (state.phase == .alerting || state.phase == .breaking || state.phase == .waiting)
+        guard !state.isInQuietHours && !state.goalAutoStopped else { return false }
+        switch state.phase {
+        case .alerting:
+            return true
+        case .breaking, .waiting:
+            // Only show break card in menu when break position is menuWindow;
+            // for floating/fullscreen, the overlay handles the break UI.
+            return state.config.breakPosition == .menuWindow
+        default:
+            return false
+        }
     }
 
     var body: some View {
