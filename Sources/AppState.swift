@@ -184,6 +184,7 @@ struct AppConfig: Equatable {
     var longBreakEnabled: Bool = false
     var longBreakInterval: Int = 4            // every N cycles
     var longBreakSeconds: Int = 900           // 15 minutes default
+    var autoCheckUpdate: Bool = true
     var shortcutKeyCode: UInt16 = 36  // Return
     var shortcutModifiers: UInt = 1048576  // Command
 
@@ -891,7 +892,7 @@ final class AppState {
         alertRepeatTimer?.invalidate()
         alertRepeatTimer = nil
         breakWarning = ""
-        overlayManager.hide()
+        overlayManager.hideAll()
 
         let actualSeconds: Int?
         if let start = breakStartDate {
