@@ -149,6 +149,17 @@ struct SystemTab: View {
                     }
                 ))
                 Divider().padding(.leading, 44)
+                toggleRow(icon: "arrow.triangle.2.circlepath", label: L.autoCheckUpdate, isOn: $state.config.autoCheckUpdate)
+                Divider().padding(.leading, 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    toggleRow(icon: "lock.display", label: L.resetOnScreenLock, isOn: $state.config.resetOnScreenLock)
+                    Text(L.resetOnScreenLockHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 46)
+                        .padding(.bottom, 4)
+                }
+                Divider().padding(.leading, 44)
                 HStack(spacing: 10) {
                     Image(systemName: "wand.and.stars")
                         .font(.callout)

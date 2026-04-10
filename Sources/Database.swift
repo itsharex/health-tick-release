@@ -146,6 +146,8 @@ final class Database {
                 case "shortcut_enabled": config.shortcutEnabled = value == "1"
                 case "shortcut_keycode": config.shortcutKeyCode = UInt16(value) ?? 36
                 case "shortcut_modifiers": config.shortcutModifiers = UInt(value) ?? 1048576
+                case "auto_check_update": config.autoCheckUpdate = value == "1"
+                case "reset_on_screen_lock": config.resetOnScreenLock = value == "1"
                 default: break
                 }
             }
@@ -195,6 +197,8 @@ final class Database {
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('shortcut_enabled', '\(config.shortcutEnabled ? "1" : "0")')")
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('shortcut_keycode', '\(config.shortcutKeyCode)')")
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('shortcut_modifiers', '\(config.shortcutModifiers)')")
+        exec("INSERT OR REPLACE INTO config (key, value) VALUES ('auto_check_update', '\(config.autoCheckUpdate ? "1" : "0")')")
+        exec("INSERT OR REPLACE INTO config (key, value) VALUES ('reset_on_screen_lock', '\(config.resetOnScreenLock ? "1" : "0")')")
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('work_hours_enabled', '\(config.workHoursEnabled ? "1" : "0")')")
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('work_start_time', '\(config.workStartTime)')")
         exec("INSERT OR REPLACE INTO config (key, value) VALUES ('work_end_time', '\(config.workEndTime)')")

@@ -149,11 +149,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            UpdateChecker.shared.check(silent: true)
+            if Database.shared.loadConfig().autoCheckUpdate {
+                UpdateChecker.shared.check(silent: true)
+            }
         }
         Timer.scheduledTimer(withTimeInterval: 4 * 3600, repeats: true) { _ in
             Task { @MainActor in
-                UpdateChecker.shared.check(silent: true)
+                if Database.shared.loadConfig().autoCheckUpdate {
+                    UpdateChecker.shared.check(silent: true)
+                }
             }
         }
 

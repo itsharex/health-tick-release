@@ -470,13 +470,14 @@ final class BreakOverlayManager {
     }
 
     func hideAll() {
-        // Save panel ref before hide() clears it via unpinMenuBarExtra()
-        let panel = menuBarExtraPanel ?? findMenuBarPanel()
         hide()
-        // Directly dismiss the MenuBarExtra panel after confirmReturn().
-        if let panel, panel.isVisible {
-            panel.orderOut(nil)
-        }
+        dismissMenuBarPanel()
+    }
+
+    /// Dismiss the MenuBarExtra panel.
+    private func dismissMenuBarPanel() {
+        guard let panel = findMenuBarPanel(), panel.isVisible else { return }
+        panel.orderOut(nil)
     }
 
     /// Find the MenuBarExtra panel by searching app windows.
@@ -636,26 +637,48 @@ final class BreakOverlayManager {
         }
     }
 
+    private var outsideClickMonitor: Any?
+
     private func unpinMenuBarExtra() {
         menuPinTimer?.invalidate()
         menuPinTimer = nil
         if let panel = menuBarExtraPanel {
             panel.hidesOnDeactivate = originalHidesOnDeactivate ?? true
-            // Don't call panel.orderOut(nil) — it desyncs macOS's internal
-            // MenuBarExtra toggle state, causing clicks to be swallowed.
-            // Restoring hidesOnDeactivate is enough; the panel will dismiss
-            // naturally on the next user interaction or app deactivation.
+            // Set up a one-shot global monitor: dismiss panel on next outside click
+            setupOutsideClickDismiss(for: panel)
         }
         menuBarExtraPanel = nil
         originalPanelLevel = nil
         originalHidesOnDeactivate = nil
     }
 
+    private func setupOutsideClickDismiss(for panel: NSPanel) {
+        // Remove any existing monitor
+        if let monitor = outsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            outsideClickMonitor = nil
+        }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self, weak panel] event in
+            guard let self, let panel, panel.isVisible else {
+                if let self, let monitor = self.outsideClickMonitor {
+                    NSEvent.removeMonitor(monitor)
+                    self.outsideClickMonitor = nil
+                }
+                return
+            }
+            // Check if click is outside the panel
+            let clickLocation = event.locationInWindow  // screen coordinates for global events
+            if !panel.frame.contains(clickLocation) {
+                panel.orderOut(nil)
+                if let monitor = self.outsideClickMonitor {
+                    NSEvent.removeMonitor(monitor)
+                    self.outsideClickMonitor = nil
+                }
+            }
+        }
+    }
+
     private func closeMenuBarExtra() {
-        // Find the MenuBarExtra panel and hide it. orderOut(nil) can desync
-        // macOS's internal toggle state, but leaving it open causes duplicate
-        // break UIs when switching from alert → floating/fullscreen break.
-        // The toggle state resyncs when the app next deactivates.
         if let panel = findMenuBarPanel() {
             panel.orderOut(nil)
         }

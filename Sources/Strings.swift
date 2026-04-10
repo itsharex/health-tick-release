@@ -133,6 +133,9 @@ struct L {
     static func shortcutQuickConfirm(_ key: String) -> String { isZh ? "按下 \(key) 快速确认" : "Press \(key) to confirm" }
     static var shortcutHint: String { isZh ? "开启后，休息提醒弹出或休息结束时，可按快捷键快速确认，无需点击按钮。仅在应用窗口获得焦点时生效。" : "When enabled, press the shortcut to quickly confirm when the break reminder appears or when break ends. Only works when the app window is focused." }
     static var launchAtLogin: String { isZh ? "开机自启动" : "Launch at Login" }
+    static var autoCheckUpdate: String { isZh ? "自动检查更新" : "Auto Check for Updates" }
+    static var resetOnScreenLock: String { isZh ? "锁屏后重置计时" : "Reset Timer on Screen Lock" }
+    static var resetOnScreenLockHint: String { isZh ? "锁屏超过 10 秒后解锁，自动重新开始计时" : "Auto restart timer when unlocking after 10+ seconds" }
     static var language: String { isZh ? "语言" : "Language" }
     static var appearance: String { isZh ? "外观" : "Appearance" }
     static var appearanceSystem: String { isZh ? "跟随系统" : "System" }

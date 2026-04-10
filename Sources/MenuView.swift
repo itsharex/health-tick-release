@@ -449,12 +449,8 @@ private func nudgeMenuBarExtraPanel() {
 }
 
 private func menuDismissPanel() {
-    // Don't call panel.orderOut(nil) — it bypasses macOS's internal
-    // MenuBarExtra toggle state machine, causing subsequent clicks on
-    // the menu bar icon to be "swallowed" (system thinks panel is still
-    // visible and toggles it to "hidden", but it's already hidden).
-    // The panel will dismiss naturally when the user interacts with the
-    // newly-opened window or clicks elsewhere.
+    // Panel will dismiss naturally when the newly-opened window activates
+    // and the user clicks elsewhere. No need to force-close here.
 }
 
 private func menuBringToFront() {

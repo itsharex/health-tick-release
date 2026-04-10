@@ -185,6 +185,7 @@ struct AppConfig: Equatable {
     var longBreakInterval: Int = 4            // every N cycles
     var longBreakSeconds: Int = 900           // 15 minutes default
     var autoCheckUpdate: Bool = true
+    var resetOnScreenLock: Bool = true
     var shortcutKeyCode: UInt16 = 36  // Return
     var shortcutModifiers: UInt = 1048576  // Command
 
@@ -304,6 +305,7 @@ final class AppState {
     private var restartPromptTimer: Timer?
     private var lastSavedConfig: AppConfig?
     private var localMonitor: Any?
+    private var screenLockTime: Date?
 
     var earnedTotalBadges: [Badge] {
         allTotalBadges.filter { totalCount >= $0.days }
@@ -362,6 +364,18 @@ final class AppState {
                 self.checkQuietHours()
                 // Re-sync stats after wake (e.g. work minutes, streak)
                 self.refreshStats()
+            }
+        }
+
+        // Screen lock/unlock detection — reset timer when user returns after locking
+        DistributedNotificationCenter.default().addObserver(forName: NSNotification.Name("com.apple.screenIsLocked"), object: nil, queue: nil) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.screenLockTime = Date()
+            }
+        }
+        DistributedNotificationCenter.default().addObserver(forName: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil, queue: nil) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleScreenUnlock()
             }
         }
 
@@ -553,7 +567,7 @@ final class AppState {
     private var pendingBadge: Badge?
 
     func confirmReturn() {
-        overlayManager.hideAll()
+        overlayManager.hide()
         let badge = pendingBadge
         pendingBadge = nil
 
@@ -625,6 +639,32 @@ final class AppState {
         }
 
         isInQuietHours = false
+        startWork()
+        checkQuietHours()
+    }
+
+    // MARK: - Screen Lock Reset
+
+    private func handleScreenUnlock() {
+        guard config.resetOnScreenLock else { return }
+        guard let lockTime = screenLockTime else { return }
+        screenLockTime = nil
+
+        let elapsed = Date().timeIntervalSince(lockTime)
+        guard elapsed >= 10 else { return }
+
+        // Don't interfere with manual pause or quiet hours
+        guard phase != .paused else { return }
+
+        timer?.invalidate()
+        alertRepeatTimer?.invalidate()
+        overlayManager.hide()
+
+        if let sid = currentSessionId {
+            db.endWork(sessionId: sid)
+            currentSessionId = nil
+        }
+
         startWork()
         checkQuietHours()
     }
@@ -892,7 +932,7 @@ final class AppState {
         alertRepeatTimer?.invalidate()
         alertRepeatTimer = nil
         breakWarning = ""
-        overlayManager.hideAll()
+        overlayManager.hide()
 
         let actualSeconds: Int?
         if let start = breakStartDate {
